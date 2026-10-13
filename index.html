@@ -74,7 +74,9 @@ const SHADOWED=new Set(['#fdfdfd','#f4f4f4','#e9e7e2','#d6b47c','#cfe3d4','#5881
 // ---------- save ----------
 const KEY='built-to-code-career-v3';
 let SAVE;try{SAVE=JSON.parse(localStorage.getItem(KEY))}catch(e){}
-SAVE=Object.assign({money:0,jobs:0,results:[],tools:{},temp:{},noAds:false,job:0,unlocked:0,done:{},fine:0},SAVE||{});if(!Array.isArray(SAVE.results))SAVE.results=[];
+SAVE=Object.assign({money:0,jobs:0,results:[],tools:{},temp:{},noAds:false,job:0,unlocked:0,done:{},fine:0,story:null,hm:{},hmMax:0,starsSpent:0,owned:{},equip:{},daily:{},evDone:{},evBonus:0,curLv:null,v:8},SAVE||{});
+// v7 → v8 migration: classic-career progress maps onto story levels (milestones 75/125/160/170)
+if(!SAVE.story){SAVE.story={max:[0,75,125,160,170][Math.min(4,SAVE.unlocked||0)]};SAVE.v=8}if(!Array.isArray(SAVE.results))SAVE.results=[];
 // ---------- career ----------
 const COMPANY='YOUR COMPANY · BUILT TO CODE';
 // Career: difficulty ramps job to job. elec = electrical level (0 guided outlet + single-pole, 1 GFCI + single-pole, 2 GFCI + 3-way). lv = general difficulty for other trades.
@@ -91,7 +93,7 @@ const TOOLS=[['Hand float','Power trowel',250,'Screeding 2.5× faster'],['Hammer
  ['Taping knife','Banjo + mud pump',250,'Seams fill 2.5× faster & wider'],['Bubble level','Laser level',250,'One shim lands it dead plumb'],
  ['Miter box','Compound miter saw',300,'Dial snaps to 22.5° & 45°'],['Tape measure','Laser + spacer kit',250,'Auto spacers & H-joint warning'],
  ['Roller','Airless paint sprayer',400,'Huge spray pattern'],['Bubble level','Tub leveling kit',300,'One shim sets the tub dead level'],['Adjustable wrench','Torque-limit wrench',250,'Tightens both bolts evenly, never cracks'],['Channel locks','Basin wrench + push-fit',250,'P-trap parts go on in the right order'],['Pry bar & shims','Cabinet jack',300,'Cabinets come out level automatically'],['Screwdriver','Fan balancing kit',200,'Shows which blade is light']];
-function curJob(){return JOBS[SAVE.job||0]}
+
 // ===== MONETIZATION STUB =====
 // All ad / in-app-purchase code goes through this object. To ship, replace the
 // bodies with AdMob rewarded ads (showRewarded) and StoreKit / Play Billing
@@ -118,8 +120,45 @@ function inR(p,x,y,w,h){return p.x>=x&&p.x<=x+w&&p.y>=y&&p.y<=y+h}
 function btn(p,b){return inR(p,b.x,b.y,b.w,b.h)}
 function button(b,label,col='#2b2d42',tc='#fff',sz=16){rr(b.x,b.y,b.w,b.h,3,col);ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=1;ctx.strokeRect(b.x+.5,b.y+.5,b.w-1,b.h-1);ctx.fillStyle='rgba(0,0,0,.12)';ctx.fillRect(b.x,b.y+b.h-2,b.w,2);ctx.letterSpacing='0.6px';txt(String(label).toUpperCase(),b.x+b.w/2,b.y+b.h/2+Math.min(sz,13)*.36,Math.min(sz,13),tc,'center','600');ctx.letterSpacing='0px'}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
-let AC;function sfx(f,d=0.06){try{AC=AC||new AudioContext();const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=f;g.gain.value=.05;o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d);}catch(e){}}
-let parts=[];function puff(x,y,c,n=5){for(let i=0;i<n;i++)parts.push({x,y,vx:(Math.random()-.5)*2,vy:-Math.random()*2,l:1,c})}
+
+let parts=[];
+// ===== SOUND (procedural WebAudio) + HAPTICS + JUICE =====
+const SND=(()=>{let A=null,NB=null,M=null;function ac(){if(!A){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;A=new C();M=A.createDynamicsCompressor();M.connect(A.destination);const n=A.sampleRate;NB=A.createBuffer(1,n,n);const d=NB.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1}if(A.state==='suspended')A.resume();return A}
+ function env(g,t,a,pk,dc){g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(pk,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+dc)}
+ function tone(f,dur,type='sine',vol=.08,f2=0,dl=0){const a=ac();if(!a)return;const t=a.currentTime+dl,o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);env(g,t,.004,vol,dur);o.connect(g);g.connect(M);o.start(t);o.stop(t+dur+.05)}
+ function noise(dur,ft='bandpass',f=1000,q=1,vol=.1,f2=0,dl=0){const a=ac();if(!a)return;const t=a.currentTime+dl,s=a.createBufferSource();s.buffer=NB;s.loop=true;const fl=a.createBiquadFilter();fl.type=ft;fl.frequency.setValueAtTime(f,t);if(f2)fl.frequency.exponentialRampToValueAtTime(f2,t+dur);fl.Q.value=q;const g=a.createGain();env(g,t,.003,vol,dur);s.connect(fl);fl.connect(g);g.connect(M);s.start(t,Math.random()*.5);s.stop(t+dur+.05)}
+ const S={
+  screw(){noise(.2,'bandpass',700,5,.08,2600);tone(160,.2,'sawtooth',.025,460);noise(.04,'lowpass',500,1,.16,0,.2);tone(70,.06,'sine',.1,50,.2)},
+  nail(){noise(.04,'lowpass',3500,1,.3);tone(95,.12,'sine',.3,38);noise(.1,'highpass',6000,1,.05,0,.02)},
+  hammer(){tone(150,.09,'triangle',.22,70);noise(.05,'bandpass',2400,2,.16)},
+  mud(){noise(.16,'bandpass',650,1.4,.07,320)},
+  roller(){noise(.14,'lowpass',420,.8,.07,260);noise(.08,'bandpass',1800,8,.012)},
+  saw(){noise(.45,'bandpass',2000,5,.08,3400);tone(105,.45,'sawtooth',.025,150);noise(.08,'lowpass',600,1,.1,0,.42)},
+  click(){noise(.012,'highpass',3500,1,.22);tone(2100,.018,'square',.03)},
+  light(){S.click();tone(60,.35,'sine',.05,60,.02);tone(660,.35,'sine',.04,1320,.02)},
+  water(){for(let i=0;i<7;i++)tone(380+Math.random()*900,.07,'sine',.05,180+Math.random()*300,i*.055);noise(.45,'bandpass',1300,1,.035)},
+  clank(){tone(640,.25,'triangle',.07,610);tone(1290,.18,'sine',.035);noise(.03,'bandpass',3200,3,.12)},
+  pour(){noise(.35,'lowpass',320,1,.09,200)},
+  whoosh(){noise(.3,'bandpass',300,1.2,.09,2800)},
+  error(){tone(150,.16,'square',.045,110);tone(156,.16,'square',.035,104,.02)},
+  zap(){noise(.28,'highpass',2200,1,.14);tone(60,.3,'sawtooth',.09,38)},
+  pop(){tone(480,.06,'sine',.09,950)},
+  coin(){tone(988,.07,'square',.045);tone(1319,.22,'square',.045,0,.07)},
+  chime(){[523,659,784,1047].forEach((f,i)=>{tone(f,.55,'sine',.07,0,i*.085);tone(f*2,.3,'triangle',.014,0,i*.085)})},
+  star(){[880,1175,1568].forEach((f,i)=>tone(f,.35,'triangle',.06,0,i*.13))},
+  thud(){tone(90,.18,'sine',.18,45);noise(.08,'lowpass',400,1,.1)}};
+ return S})();
+function buzz(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
+let SHAKE=0;function shake(n){SHAKE=Math.max(SHAKE,n)}
+function confetti(n=60){const C=['#ffb703','#2a9d8f','#e76f51','#4361ee','#ffffff','#e9c46a'];for(let i=0;i<n;i++)parts.push({x:SB+Math.random()*(W-SB),y:-10-Math.random()*40,vx:(Math.random()-.5)*3,vy:Math.random()*2,l:2.2,c:C[i%C.length],big:1})}
+// Map the legacy sfx(freq) calls onto proper trade sounds based on what you are doing
+function sfx(f,d=.06){try{const n=(mode==='play'&&STAGES[cur])?STAGES[cur].name:'';
+ if(f<100){SND.zap();buzz([40,30,60]);shake(5);return}if(f<=160){SND.error();buzz([25,30,25]);shake(2);return}
+ if(f===660&&d>=.15){SND.chime();return}if(f>=880){SND.coin();buzz(15);return}if(f===800){SND.click();buzz(6);return}if(f===420&&d<=.03){SND.click();return}
+ const m={Drywall:'screw',Framing:SAVE.tools[1]?'nail':'hammer',Concrete:'pour',Plumbing:'clank',Electrical:'click',HVAC:'whoosh','Tape & Mud':'mud',Paint:'pop',Doors:'screw',Trim:f>=700?'saw':'nail',Flooring:'hammer',Tub:'clank',Toilet:'clank',Vanity:'clank',Kitchen:'clank','Ceiling Fan':'click','Service Call':'pop'}[n]||'pop';
+ SND[m]();buzz(m==='nail'||m==='hammer'?18:8);if(m==='nail'||m==='saw')shake(1.5)}catch(e){}}
+
+function puff(x,y,c,n=5){for(let i=0;i<n;i++)parts.push({x,y,vx:(Math.random()-.5)*2,vy:-Math.random()*2,l:1,c})}
 // ---------- per-job themes ----------
 const THEMES=[
 {k:'shed',scale:.86,bd:'outdoor',wall:'sky',sheet:'#d6b47c',groove:1,floor:'grass',dirt:'#6a9a3a',paint:['#9b2226','#2d6a4f','#5c677d','#c9a66b','#f8f9fa'],wallPaint:'#9b2226',door:['#9b2226','#7a1b1e','z'],trimH:10,tile:['#e8e8e8','#dcdcdc'],flr:{c:['#c68b59','#b87a4b','#d19a66'],PL:192,grout:0}},
@@ -163,11 +202,7 @@ function strokePath(p,c,w){if(!p||p.length<2)return;ctx.strokeStyle=c;ctx.lineWi
 let mode='title',cur=-1,st=null,t0=0,MSG='',toast=null,down=false,last=null,downSide=false;
 function msg(m){MSG=m}
 let INS=null,prevMode='career';
-function finish(q,issues=[]){q=clamp(q,.2,1);const S=STAGES[cur];const t=now()-t0;const sp=clamp(S.par/Math.max(1,t),.5,1.2);
- parts=[];const r={q,t,pay:Math.round((20+80*q*sp)*curJob().mult),issues};sfx(660,.15);
- if(INSPECT.includes(cur)){INS={stage:cur,r,issues};mode='inspect'}else commit(cur,r)}
 function commit(i,r){SAVE.results[i]=r;save();toast={t:now(),s:STAGES[i].name+' done! +$'+r.pay};mode='map'}
-function startStage(i){cur=i;st={miss:0,tool:!!(SAVE.tools[i]||SAVE.temp[i])};if(SAVE.temp[i]){delete SAVE.temp[i];save()}t0=now();mode='play';parts=[];msg(STAGES[i].tip);STAGES[i].init();}
 // ---- shared fixture helpers ----
 function lvlInit(){st.a=(Math.random()<.5?-1:1)*(1+Math.floor(Math.random()*4)*.5);st.shims=0}
 function shim(d,fast){if(d<0)st.a-=fast&&st.a>0?st.a:.5;else st.a+=fast&&st.a<0?-st.a:.5;st.shims++;sfx(260);st.a=Math.round(st.a*2)/2;msg(st.a===0?'Level! Tap SET':'Off level '+st.a.toFixed(1)+'° — shim the low side')}
@@ -310,7 +345,7 @@ check(){const C=this.C(),R=(C.three?[[0,0],[1,0],[0,1],[1,1]]:[[0,0],[1,0]]).map
 flip(w){if(st.tut)return;st['s'+w]^=1;st['f'+w]=1;sfx(800,.03);const r=this.sim(st.s1,st.s2),three=this.C().three;
  if(r.short){st.zap=now();st.miss++;sfx(90,.4);puff(500,200,'#ffb703',20);msg('ZAP! Dead short — breaker tripped');return}
  if(st.f1&&(st.f2||!three)){const c=this.check();if(c.core==='ok'){msg(three?'Light works from both switches! ✔':'Switch controls the light! ✔');setTimeout(()=>{if(mode==='play'&&STAGES[cur]===this&&st.ph==='wire')finish(1-st.miss*.06-st.hints*.04,c.is)},700)}else{msg(c.core);st.miss+=.5}}
- else msg(r.on||r.rev?'Light ON — flip the other switch too':'Light off — flip the other switch too')},
+ else{if(r.on||r.rev)SND.light();else SND.click()}if(!(st.f1&&(st.f2||!three)))msg(r.on||r.rev?'Light ON — flip the other switch too':'Light off — flip the other switch too')},
 nextHint(){const C=this.C();return C.sol.find(([a,b])=>!st.edges.some(e=>e.includes(a)&&e.includes(b)))},
 hint(){const h=this.nextHint();if(!h){msg('All the right connections are made — flip the switch'+(this.C().three?'es':''));return}st.hints++;st.hintT=now();msg('Hint: connect '+h[0].replace('_',' ')+' → '+h[1].replace('_',' '))},
 ctrls(){if(st.ph==='term'){const D=this.DEV[st.devs[st.dv]];return D.w.map((w,i)=>({l:w[0],sw:w[1],h:D.w.length>3?32:36,c:st.sel===i?'#ffb703':st.done[i]?'#2a9d8f':'#2b2d42',tc:st.sel===i?'#2b2d42':'#fff',f:()=>{if(!st.done[i])st.sel=i}}))}
@@ -407,7 +442,7 @@ init(){st.pi=0;st.hits=0;st.seams=[1,2,3].map(k=>({x:WX+k*SHEET,v:[[],[],[]].map
 down(p){this.work(p)},
 move(p,l){const n=Math.max(1,Math.ceil(dist(p,l)/4));for(let i=1;i<=n;i++)this.work({x:l.x+(p.x-l.x)*i/n,y:l.y+(p.y-l.y)*i/n})},
 work(p){if(p.y<WY||p.y>FY||st.pi>2)return;let hit=false;for(const s of st.seams)if(Math.abs(p.x-s.x)<(st.tool?22:14)){hit=true;const i=Math.min(23,Math.floor((p.y-WY)/WH*24));const a=s.v[st.pi];if(a[i]<1){a[i]=Math.min(1,a[i]+(st.tool?.6:.25));if(Math.random()<.3)puff(p.x,p.y,'#ddd')}}
- if(hit)st.hits++;else if(inR(p,WX,WY,WW,WH))st.miss++;
+ if(hit){st.hits++;if(now()-(st.snd||0)>.13){st.snd=now();st.pi===2?SND.roller():SND.mud()}}else if(inR(p,WX,WY,WW,WH))st.miss++;
  if(st.seams.every(s=>s.v[st.pi].every(v=>v>=1))){st.pi++;sfx(520);if(st.pi===1)msg('Taped! Now swipe again to cover with mud');else if(st.pi===2)msg('Mud is dry! Scrub the seams to sand');else{const q=st.hits/(st.hits+st.miss*.5+1);finish(q,q<.7?['Visible ridges — mud smeared off the seams']:[])}}},
 draw(){wallBG();drywallWall();const ph=Math.min(st.pi,2);
  for(const s of st.seams){ctx.fillStyle='#bdb9af';ctx.fillRect(s.x-1,WY,2,WH);for(let i=0;i<24;i++){const y=WY+i*WH/24,h=WH/24+1,[t,m,sd]=[s.v[0][i],s.v[1][i],s.v[2][i]];
@@ -476,11 +511,11 @@ GW:48,GH:24,
 init(){Object.assign(st,{color:null,grid:new Uint8Array(48*24),strokes:[],over:0,R:st.tool?55:32})},
 cover(){let s=0;for(const v of st.grid)s+=v;return s/st.grid.length},
 fin(){const c=this.cover();if(c<.9){msg('Keep rolling — need 90% coverage');return}finish(c-Math.min(.3,st.over*.003),c<.97?['Holidays (missed spots) in paint — '+Math.round(c*100)+'% coverage']:[])},
-ctrls(){const c=TH().paint.map(col=>({sw:col,h:24,l:'',c:st.color===col?'#ffb703':'#2b2d42',f:()=>{st.color=col;sfx(500)}}));c.push({l:'Finish',c:this.cover()>=.9?'#2a9d8f':'#888',f:()=>this.fin()});return c},
+ctrls(){const c=PAL().map(col=>({sw:col,h:24,l:'',c:st.color===col?'#ffb703':'#2b2d42',f:()=>{st.color=col;sfx(500)}}));c.push({l:'Finish',c:this.cover()>=.9?'#2a9d8f':'#888',f:()=>this.fin()});return c},
 down(p){this.paint(p)},
 move(p,l){const n=Math.max(1,Math.ceil(dist(p,l)/6));for(let i=1;i<=n;i++)this.paint({x:l.x+(p.x-l.x)*i/n,y:l.y+(p.y-l.y)*i/n})},
 paint(p){if(!st.color){msg('Pick a paint color first!');return}if(!inR(p,WX-20,WY-20,WW+40,WH+40))return;if(!inR(p,WX,WY,WW,WH))st.over++;
- st.strokes.push({x:p.x,y:p.y,c:st.color,r:st.R});if(st.strokes.length>5000)st.strokes.shift();
+ st.strokes.push({x:p.x,y:p.y,c:st.color,r:st.R});if(now()-(st.snd||0)>.13){st.snd=now();SND.roller()}if(st.strokes.length>5000)st.strokes.shift();
  const g0=Math.max(0,Math.floor((p.x-WX-st.R)/12)),g1=Math.min(47,Math.ceil((p.x-WX+st.R)/12)),h0=Math.max(0,Math.floor((p.y-WY-st.R)/12)),h1=Math.min(23,Math.ceil((p.y-WY+st.R)/12));
  for(let gy=h0;gy<=h1;gy++)for(let gx=g0;gx<=g1;gx++)if(Math.hypot(WX+(gx+.5)*12-p.x,WY+(gy+.5)*12-p.y)<st.R)st.grid[gy*48+gx]=1;
  const c=this.cover();msg('Coverage '+Math.round(c*100)+'%'+(c>=.9?' — tap FINISH when happy':''))},
@@ -595,6 +630,48 @@ draw(){const T=TH();ctx.fillStyle=T.wall==='sky'?'#eee':T.wall;ctx.fillRect(-400
  ctx.fillStyle='#495057';ctx.beginPath();ctx.arc(0,0,32,0,7);ctx.fill();ctx.fillStyle='#fff3bf';ctx.beginPath();ctx.arc(0,0,18,0,7);ctx.fill();ctx.restore();
  ctx.strokeStyle='rgba(0,0,0,.08)';ctx.lineWidth=40;ctx.beginPath();ctx.arc(180,300,90,ang,ang+1);ctx.stroke();
  rr(60,470,240,14,7,'#fff');rr(60,470,Math.max(14,240*Math.min(1,wb/1.2)),14,7,wb<.1?'#2a9d8f':'#e63946');txt('Wobble',180,500,12,'#2b2d42')}},
+// 17 SERVICE CALL / EVENT ENGINE (index 16) — data-driven mini-tasks: diag → tap / drag / swipe / choice steps
+{name:'Service Call',icon:'🧰',par:60,tip:'',
+init(){const D=CALLDEF;Object.assign(st,{D,si:-1,ph:D.diag?'diag':'work',marks:[],o:null,seq:0,done:{},cov:null,q:null});if(D.event)msg('⚠ '+D.n+' '+D.complaint);else msg('"'+D.complaint+'"');if(!D.diag)this.next()},
+step(){return st.D.steps[st.si]},
+next(){st.si++;st.seq=0;st.done={};st.drag=null;const s=this.step();if(!s){callDone();return}
+ if(s.rm!=null)st.marks=st.marks.filter(m=>m.si!==s.rm);
+ if(s.t==='drag')st.o={...s.o};if(s.t==='swipe')st.cov=s.segs.map(()=>new Array(12).fill(0));
+ if(s.t==='choice'){if(s.q)st.q=INSPQ[Math.floor(Math.random()*INSPQ.length)];else if(s.w){const sk=CALLCTX&&CALLCTX.next;st.q=WRONGQ[sk]||WRONGQ[5]}else st.q={q:s.m,o:s.o,ok:s.ok,why:s.why}}
+ msg(s.t==='choice'?st.q.q:s.m)},
+ctrls(){if(st.ph==='diag'){const d=st.D.diag;return d.o.map((l,i)=>({l,h:34,f:()=>this.diag(i)}))}const s=this.step();if(s&&s.t==='choice')return st.q.o.map((l,i)=>({l,f:()=>this.choose(i)}));return[]},
+diag(i){const d=st.D.diag;if(i===d.ok){st.ph='work';SND.star();buzz(15);msg('Diagnosis: '+d.o[i]+' ✔');this.next()}else{st.miss++;sfx(140);msg('Not it — '+d.why)}},
+choose(i){if(i===st.q.ok){SND.pop();buzz(10);this.next()}else{st.miss++;sfx(140);msg('Not quite'+(st.q.why?' — '+st.q.why:'')+'. Try again')}},
+down(p){if(st.ph==='diag')return;const s=this.step();if(!s)return;
+ if(s.t==='tap'){for(let k=0;k<s.it.length;k++){const it=s.it[k];if(st.done[k])continue;if(dist(p,it)<22){if(it.bad){st.miss++;sfx(140);msg(it.bad);puff(it.x,it.y,'#e63946',8);return}
+    const good=s.it.map((t,j)=>j).filter(j=>!s.it[j].bad);if(s.ord&&k!==good[st.seq]){st.miss++;sfx(140);msg('Order matters — '+(s.it[good[st.seq]].n||'the first one')+' first');return}
+    st.done[k]=1;st.seq++;SND[s.snd||'click']();buzz(10);puff(it.x,it.y,'#ffd166',8);if(good.every(j=>st.done[j])){st.marks.push({si:st.si,taps:s.it.filter(t=>!t.bad)});setTimeout(()=>{if(mode==='play'&&cur===16&&this.step()===s)this.next()},250)}return}}}
+ else if(s.t==='drag'){if(inR(p,st.o.x-8,st.o.y-8,st.o.w+16,st.o.h+16))st.drag={dx:p.x-st.o.x,dy:p.y-st.o.y}}
+ else if(s.t==='swipe')this.move(p,p)},
+move(p,l){const s=this.step();if(!s||st.ph==='diag')return;if(s.t==='drag'&&st.drag){st.o.x=p.x-st.drag.dx;st.o.y=p.y-st.drag.dy}
+ if(s.t==='swipe'&&st.cov){const n=Math.max(1,Math.ceil(dist(p,l)/5));for(let i=0;i<=n;i++){const q={x:l.x+(p.x-l.x)*i/n,y:l.y+(p.y-l.y)*i/n};
+   s.segs.forEach((g,gi)=>{const [x1,y1,x2,y2]=g,dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy;const tt=((q.x-x1)*dx+(q.y-y1)*dy)/L2;if(tt<-.04||tt>1.04)return;const px=x1+dx*clamp(tt,0,1),py=y1+dy*clamp(tt,0,1);if(Math.hypot(q.x-px,q.y-py)<(s.w||16)+(st.tool?10:6)){const c=clamp(Math.floor(tt*12),0,11);st.cov[gi][c]=Math.min(1,st.cov[gi][c]+.4)}})}
+  if(now()-(st.snd||0)>.12){st.snd=now();SND[s.snd||'mud']()}if(Math.random()<.3)puff(p.x,p.y,s.c||'#ddd',2);
+  if(st.cov.every(a=>a.every(v=>v>=1))){st.marks.push({si:st.si,segs:s.segs,w:s.w||16,c:s.c});st.cov=null;buzz(12);this.next()}}},
+up(){const s=this.step();if(s&&s.t==='drag'&&st.drag){st.drag=null;const T=s.to,tol=T.tol||s.tol||45;if(Math.abs(st.o.x+st.o.w/2-(T.x+T.w/2))<tol&&Math.abs(st.o.y+st.o.h/2-(T.y+T.h/2))<tol){Object.assign(st.o,{x:T.x+(T.w-st.o.w)/2,y:T.y+(T.h-st.o.h)/2});st.marks.push({si:st.si,o:{...st.o}});SND[s.snd||'clank']();buzz(14);shake(1.5);puff(T.x+T.w/2,T.y+T.h/2,'#fff',10);this.next()}else{st.o={...s.o};msg('Not there — '+s.m.toLowerCase())}}},
+bg(){const b=st.D.bg;if(b==='wall'){wallBG();drywallWall(false);finishedSeams();ctx.fillStyle='rgba(214,207,196,.55)';ctx.fillRect(WX,WY,WW,WH)}
+ else if(b==='bath'){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#d5e3e6';for(let y=0;y<FY;y+=20){ctx.fillRect(0,y,W,1);for(let x=((y/20)%2)*20;x<W;x+=40)ctx.fillRect(x,y,1,20)}ctx.fillStyle='#dfe6ea';ctx.fillRect(0,FY+10,W,H)}
+ else if(b==='floor'){ctx.fillStyle='#9aa5ad';ctx.fillRect(0,0,W,H);for(let y=-10;y<H;y+=80)for(let x=150;x<W;x+=80){ctx.fillStyle=((x+y)/80)%2?'#e8ebee':'#dde2e6';ctx.fillRect(x+2,y+2,76,76)}}
+ else if(b==='kitchen'){ctx.fillStyle='#f3ead8';ctx.fillRect(0,0,W,H);ctx.fillStyle='#8d6e63';ctx.fillRect(360,40,300,12);ctx.fillStyle='#5c4033';ctx.fillRect(370,52,280,320);ctx.fillStyle='#3e2c22';ctx.fillRect(380,62,260,300);
+  ctx.strokeStyle='#ced4da';ctx.lineWidth=12;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(500,60);ctx.lineTo(500,200);ctx.quadraticCurveTo(500,250,470,240);ctx.quadraticCurveTo(440,226,470,210);ctx.lineTo(600,236);ctx.lineTo(640,236);ctx.stroke()}
+ else{ctx.fillStyle='#8a8f94';ctx.fillRect(0,0,W,H);ctx.fillStyle='#6c7177';for(let x=0;x<W;x+=60)ctx.fillRect(x,0,2,H);ctx.fillStyle='#5a5f63';ctx.fillRect(0,340,W,60)}},
+draw(){this.bg();const D=st.D,s=this.step();
+ for(const d of D.deco||[]){if(st.si>=(d.s1==null?1e9:d.s1))continue;if(d.round){ctx.fillStyle=d.c;ctx.beginPath();ctx.arc(d.x+d.w/2,d.y+d.h/2,d.w/2,0,7);ctx.fill()}else rr(d.x,d.y,d.w,d.h,3,d.c);if(d.crack){ctx.strokeStyle='#555';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(d.x+8,d.y+12);ctx.lineTo(d.x+40,d.y+44);ctx.lineTo(d.x+30,d.y+60);ctx.lineTo(d.x+72,d.y+72);ctx.stroke()}if(d.l){const fz=d.big?90:28;txt(d.l,d.x+d.w/2,d.y+d.h/2+fz*.35,fz,'#000')}}
+ if(D.bg==='wall'&&D.steps.some(x=>x.it&&x.it.some(t=>t.x===262))){rr(234,105,56,90,4,'#6c757d');for(let i=0;i<6;i++)rr(243,112+i*13,38,9,2,'#343a40');txt('PANEL',262,210,10,'#333')}
+ for(const m of st.marks){if(m.o){const o=m.o;rr(o.x,o.y,o.w,o.h,3,o.c);if(o.l){const fz=Math.min(90,Math.min(o.w,o.h)*.75);txt(o.l,o.x+o.w/2,o.y+o.h/2+fz*.35,fz,'#000')}}if(m.segs)for(const g of m.segs)strokePath([{x:g[0],y:g[1]},{x:g[2],y:g[3]}],m.c,m.w*.8);if(m.taps)for(const t of m.taps){ctx.fillStyle='#2a9d8f';ctx.beginPath();ctx.arc(t.x,t.y,6,0,7);ctx.fill()}}
+ if(s&&st.ph!=='diag'){if(s.t==='tap'){const finder=owned('up_finder')&&s.hide;s.it.forEach((it,k)=>{if(st.done[k]){ctx.fillStyle='#2a9d8f';ctx.beginPath();ctx.arc(it.x,it.y,8,0,7);ctx.fill();return}if(it.c){ctx.fillStyle=it.c;ctx.beginPath();ctx.arc(it.x,it.y,9,0,7);ctx.fill()}if(it.l)txt(it.l,it.x,it.y+8,22,'#000');pulse(it.x,it.y,finder&&!it.bad?'#2a9d8f':'#e76f51',7);if(!s.hide&&it.n)txt(it.n,it.x,it.y-16,10,'#2b2d42','center','700');else if(s.hide)txt('?',it.x,it.y-16,11,'#2b2d42','center','700')})}
+  else if(s.t==='drag'){const T=s.to;ctx.setLineDash([6,5]);ctx.strokeStyle='#e76f51';ctx.lineWidth=2;ctx.strokeRect(T.x,T.y,T.w,T.h);ctx.setLineDash([]);const o=st.o;if(o.c!=='rgba(0,0,0,0)')rr(o.x+3,o.y+3,o.w,o.h,3,'rgba(0,0,0,.2)');rr(o.x,o.y,o.w,o.h,3,o.c);if(o.l){const fz=Math.min(90,Math.min(o.w,o.h)*.75);txt(o.l,o.x+o.w/2,o.y+o.h/2+fz*.35,fz,'#000')}}
+  else if(s.t==='swipe'&&st.cov){s.segs.forEach((g,gi)=>{const [x1,y1,x2,y2]=g;ctx.setLineDash([5,5]);ctx.strokeStyle='rgba(231,111,81,.7)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([]);
+    for(let c=0;c<12;c++){const v=st.cov[gi][c];if(v<=0)continue;const a={x:x1+(x2-x1)*c/12,y:y1+(y2-y1)*c/12},b={x:x1+(x2-x1)*(c+1)/12,y:y1+(y2-y1)*(c+1)/12};ctx.globalAlpha=v;strokePath([a,b],s.c||'#fff',(s.w||16)*.8);ctx.globalAlpha=1}})}
+  else if(s.t==='choice'){rr(300,120,400,120,8,'rgba(255,255,255,.95)');wrap(st.q.q,500,160,360,15,'#2b2d42',20,'center',3);txt('◀ answer on the left',500,224,11,'#888','center','400')}}
+ if(st.ph==='diag'){rr(250,40,500,150,10,'rgba(255,255,255,.96)');txt(D.icon+'  '+(D.event?'TWIST: ':'')+D.n,270,70,16,'#2b2d42','left','800');wrap('"'+D.complaint+'"',270,98,460,13,'#444',18,'left',3);txt('DIAGNOSE: '+D.diag.q,270,170,13,'#e76f51','left','800')}
+ if(D.event&&st.ph!=='diag'){rr(560,8,250,26,13,'rgba(231,111,81,.92)');txt('⚠ TWIST: '+D.n,685,26,11,'#fff','center','800')}}},
+
 ];
 // ---------- sidebar HUD + controls ----------
 const CY0=168,CSTEP=42,CX=10,CW=160;
@@ -603,10 +680,10 @@ const BACKP={x:8,y:8,w:62,h:24};
 function hud(){const g=ctx.createLinearGradient(0,0,SB,0);g.addColorStop(0,'#24282d');g.addColorStop(1,'#2b2d42');ctx.fillStyle=g;ctx.fillRect(0,0,SB,H);ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(SB-2,0,2,H);
  rr(BACKP.x,BACKP.y,BACKP.w,BACKP.h,4,'#444');txt('◀ Map',BACKP.x+BACKP.w/2,BACKP.y+16,10,'#fff');txt('⏱ '+(now()-t0).toFixed(0)+'s',SB-10,24,12,'#fff','right','400');
  ctx.letterSpacing='1.5px';txt(COMPANY,10,50,8.5,'#ffb703','left');ctx.letterSpacing='0px';
- txt(curJob().icon+' '+STAGES[cur].name.toUpperCase(),10,72,15,'#fff','left','700');
- const T=TOOLS[cur];txt('🔧 '+(st.tool?T[1]:T[0]),10,90,9.5,st.tool?'#ffb703':'#8d93ab','left',st.tool?'800':'400');
+ txt(cur===16?st.D.icon+' '+st.D.n.toUpperCase():curJob().icon+' '+STAGES[cur].name.toUpperCase(),10,72,cur===16?12:15,'#fff','left','700');{const hc=equipCol('Hard hat');ctx.fillStyle=hc;ctx.beginPath();ctx.arc(160,92,8,Math.PI,0);ctx.fill();ctx.fillRect(150,91,20,3);rr(0,H-6,SB-2,6,0,equipCol('Tool belt'));ctx.fillStyle=equipCol('Tool skin');ctx.fillRect(8,84,3,8)}
+ const T=TOOLS[cur]||['Handyman kit','Handyman kit'];txt('🔧 '+(st.tool?T[1]:T[0]),10,90,9.5,st.tool?'#ffb703':'#8d93ab','left',st.tool?'800':'400');
  ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(10,98,SB-20,1);wrap(MSG,10,114,SB-20,11.5,'#e4e6f0',14,'left',4);
- for(const c of ctrlList()){button(c,c.l,c.c||'#2b2d42',c.tc||'#fff',c.h<30?11:13);if(c.sw){rr(c.x+6,c.y+5,c.l?24:c.w-12,c.h-10,3,c.sw);if(c.c==='#ffb703'){ctx.strokeStyle='#ffb703';ctx.lineWidth=3;ctx.strokeRect(c.x+1.5,c.y+1.5,c.w-3,c.h-3)}}}}
+ for(const c of ctrlList()){button(c,c.l,c.c||'#2b2d42',c.tc||'#fff',c.l.length>17?9.5:c.h<30?11:13);if(c.sw){rr(c.x+6,c.y+5,c.l?24:c.w-12,c.h-10,3,c.sw);if(c.c==='#ffb703'){ctx.strokeStyle='#ffb703';ctx.lineWidth=3;ctx.strokeRect(c.x+1.5,c.y+1.5,c.w-3,c.h-3)}}}}
 // ---------- screens ----------
 const START={x:W/2-100,y:300,w:200,h:50};
 function nextIdx(){for(const i of curJob().stages)if(!SAVE.results[i])return i;return -1}
@@ -667,47 +744,242 @@ function drawAd(){ctx.fillStyle='rgba(0,0,0,.92)';ctx.fillRect(0,0,W,H);const le
  rr(W/2-220,60,440,280,10,'#444');ctx.strokeStyle='#888';ctx.setLineDash([8,6]);ctx.lineWidth=2;ctx.strokeRect(W/2-210,70,420,260);ctx.setLineDash([]);
  txt('Reward in '+Math.ceil(left)+'s',W/2,110,16,'#fff');txt('Ad placeholder',W/2,195,28,'#fff','center','900');txt('Rewarded video (mock) · '+AD.placement,W/2,225,12,'#ccc','center','400');
  rr(W/2-160,290,320,10,5,'#666');rr(W/2-160,290,320*(1-left/AD.len),10,5,'#ffb703')}
+// ===== STORY MODE: seeded procedural levels =====
+function rng(seed){let a=seed>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+// Skill unlock schedule (story level → trade stage index, or electrical tier e)
+const SKILLS=[{lv:1,s:10},{lv:1,s:5},{lv:12,s:6},{lv:24,s:9},{lv:36,s:8},{lv:48,s:7},{lv:60,s:1},{lv:72,s:0},{lv:84,s:2},{lv:96,s:3,e:0},{lv:108,s:11},{lv:108,s:12},{lv:120,s:13},{lv:132,e:1,n:'GFCI wiring'},{lv:144,s:4},{lv:156,s:14},{lv:168,s:15},{lv:180,e:2,n:'3-way switches'}];
+const ALL_SKILLS_LV=180;
+function skillName(k){return k.n||STAGES[k.s].name+(k.e===0?' (basic)':'')}
+const MILESTONE={75:0,125:1,160:2,170:3,200:4};
+const ORDER=[0,1,2,4,3,11,5,6,7,9,12,13,14,15,8,10];
+const ROOMS=[{n:'Bedroom',i:'🛏️',th:2},{n:'Bathroom',i:'🛁',th:1,room:'bathroom'},{n:'Kitchen',i:'🍳',th:2,room:'kitchen'},{n:'Living Room',i:'🛋️',th:2},{n:'Hallway',i:'🚪',th:2},
+ {n:'Garage',i:'🚗',th:0,room:'garage'},{n:'Basement',i:'🧰',th:2,room:'basement'},{n:'Shed',i:'🛖',th:0},{n:'Home Office',i:'💻',th:2},{n:'Laundry Room',i:'🧺',th:1,room:'laundry'}];
+const CLIENTS=['Mrs. Alvarez','The Parkers','Mr. Chen','Dana R.','The Okafors','Grandpa Joe','Ms. Patel','The Lindqvists','Coach Rivera','Dr. Yamada','The Novaks','Sam & Lee'];
+function roomOK(s,R){if(s===11||s===12||s===13)return R.n==='Bathroom';if(s===14)return R.n==='Kitchen';if(s===0)return['Garage','Shed','Basement'].includes(R.n);return true}
+const LCACHE=new Map();
+function genLevel(N,seed=N){const key=N+':'+seed;if(LCACHE.has(key))return LCACHE.get(key);if(LCACHE.size>600)LCACHE.clear();
+ const r=rng(seed*7919+13),pick=a=>a[Math.floor(r()*a.length)];let L;
+ const known=SKILLS.filter(k=>k.lv<=N),trades=[...new Set(known.filter(k=>k.s!=null).map(k=>k.s))],eMax=Math.max(0,...known.filter(k=>k.e!=null).map(k=>k.e));
+ const fresh=seed===N?SKILLS.filter(k=>k.lv===N&&N>1):[];
+ if(seed===N&&MILESTONE[N]!=null){const J=JOBS[MILESTONE[N]];L={...J,n:J.n,icon:J.icon,milestone:1,stages:[...J.stages],client:pick(CLIENTS)}}
+ else{let R=pick(ROOMS);const fs=fresh.map(k=>k.s!=null?k.s:3);if(fs.some(s=>s===11||s===12||s===13))R=ROOMS[1];else if(fs.includes(14))R=ROOMS[2];else if(fs.includes(0)&&!roomOK(0,R))R=ROOMS[5];
+  const allowed=trades.filter(s=>roomOK(s,R));const cnt=N<20?1+(r()<.45?1:0):N<100?2+(r()<.35?1:0):2+Math.floor(r()*3);const set=new Set(fs);
+  let guard=0;while(set.size<Math.min(cnt,allowed.length)&&guard++<50)set.add(pick(allowed));
+  const size=Math.floor(r()*3);L={n:['Small','Medium','Large'][size]+' '+R.n+' '+pick(['refresh','repair','makeover','fix-up','upgrade']),icon:R.i,th:R.th,room:R.room||'bathroom',client:pick(CLIENTS),
+   stages:ORDER.filter(s=>set.has(s)),size,d:''};
+  L.d=L.client+' wants their '+R.n.toLowerCase()+' '+pick(['done before the in-laws visit','ready to sell','fixed after a leak','updated at last','looking brand new'])}
+ L.story=seed===N?N:0;L.N=N;L.seed=seed;L.mult=+(1+Math.min(4,N/100)+(L.size||0)*.1).toFixed(2);L.lv=N<60?0:N<ALL_SKILLS_LV?1:2;
+ L.elec=fresh.some(k=>k.e!=null)?Math.max(...fresh.filter(k=>k.e!=null).map(k=>k.e)):(L.milestone?Math.min(L.elec||0,eMax):Math.floor(r()*(eMax+1)));
+ L.fresh=fresh.map(skillName);L.events={};if(N>=5)for(const s of L.stages){if(r()<(seed===N?.15:.25)){const ev=EVENT_IDS.filter(e=>EVENTS[e].on.includes(s)||EVENTS[e].on==='*');if(ev.length)L.events[s]=pick(ev)}}
+ LCACHE.set(key,L);return L}
+// ===== RANDOM EVENTS (quick extra mini-task, mild) =====
+const INSPQ=[{q:'Smoke alarm required in every bedroom?',o:['Yes','No'],ok:0},{q:'Minimum bath exhaust fan?',o:['50 CFM','10 CFM'],ok:0},{q:'Kitchen counter outlets need…',o:['GFCI protection','A dimmer'],ok:0},{q:'Drain slope for a 2" pipe?',o:['¼" per foot','2" per foot'],ok:0},{q:'Stud spacing on this wall?',o:['16" on center','30" on center'],ok:0}];
+const WRONGQ={5:{q:'Delivered: ¼" panels. Walls need…',o:['½" drywall','¼" drywall','Ceiling tile'],ok:0},9:{q:'Delivered: carpet pad. You ordered…',o:['Underlayment + planks','Carpet pad','Roofing felt'],ok:0},10:{q:'Delivered: exterior oil paint. For interior walls use…',o:['Interior latex','Exterior oil','Deck stain'],ok:0},6:{q:'Delivered: caulk. For seams you need…',o:['Joint compound + tape','Silicone caulk','Wood glue'],ok:0},2:{q:'Delivered: 1¼" pipe. A toilet drain is…',o:['3" drain','1¼" drain','½" supply'],ok:0},7:{q:'Delivered: a 30" slab. Opening is for…',o:['36" door','30" door','24" door'],ok:0}};
+const EVENTS={
+ rot:{on:[9,11,12,13,1],n:'Rotten subfloor!',icon:'🪵',bg:'floor',complaint:'Your foot just sank through the floor — rot from an old leak.',steps:[
+  {t:'tap',m:'Probe and mark the soft spots',hide:1,it:[{x:420,y:150,n:'soft'},{x:560,y:230,n:'soft'},{x:470,y:300,n:'soft'},{x:660,y:130,bad:'Solid — that one is fine'}],snd:'thud'},
+  {t:'drag',m:'Screw a new plywood patch over the rot',o:{x:640,y:300,w:150,h:80,c:'#d6b47c',l:'▦'},to:{x:400,y:140,w:240,h:180},tol:90,snd:'screw'}]},
+ pipe:{on:[5,1,3,15,8,6],n:'Hidden pipe in the wall!',icon:'🚿',bg:'wall',complaint:'You were about to cut — the stud finder beeps for metal.',steps:[
+  {t:'tap',m:'Pick a SAFE spot to cut (the scan shows a pipe)',hide:1,it:[{x:380,y:180,bad:'BEEP — copper pipe right there!'},{x:520,y:180,n:'safe'},{x:660,y:180,bad:'BEEP — pipe behind this spot too'}],snd:'click'},
+  {t:'swipe',m:'Cut along the line with the jab saw',segs:[[480,140,560,140],[560,140,560,220],[560,220,480,220],[480,220,480,140]],w:14,c:'#3d3d3d',snd:'saw'}]},
+ insp:{on:'*',n:'Surprise inspection!',icon:'🕵️',bg:'wall',complaint:'The inspector dropped by unannounced with a quick question.',steps:[{t:'choice',m:'Answer the inspector',q:1}]},
+ wrong:{on:[5,9,10,6,2,7],n:'Wrong material delivered',icon:'🚚',bg:'wall',complaint:'The supply yard sent the wrong stuff. Pick what you actually need.',steps:[{t:'choice',m:'Pick the right material',w:1},{t:'tap',m:'Sign for the right delivery',it:[{x:500,y:240,n:'sign',l:'✍️'}],snd:'pop'}]},
+ leak:{on:[2,11,12,13,14],n:'Shutoff valve dripping',icon:'💧',bg:'kitchen',complaint:'The old shutoff under the sink is dripping onto your tools.',steps:[
+  {t:'drag',m:'Slide a bucket under the drip',o:{x:660,y:320,w:60,h:50,c:'#4361ee',l:'🪣'},to:{x:470,y:300,w:60,h:50}},{t:'tap',m:'Snug the packing nut a quarter turn',it:[{x:500,y:220,n:'packing nut'}],snd:'clank'}]}};
+const EVENT_IDS=Object.keys(EVENTS);
+// ===== HANDYMAN MODE: short service calls =====
+const HANDYMAN_UNLOCK=20;
+const CALLS=[
+ {id:'patch',lv:20,n:'Doorknob hole',icon:'🕳️',bg:'wall',complaint:'The doorknob punched a hole right through my wall!',diag:{q:'Best fix for a 3" hole?',o:['California patch','Caulk it','Paint over it'],ok:0,why:'a hole that size needs new drywall behind the mud'},
+  deco:[{x:470,y:160,w:44,h:44,c:'#2b2b2b',round:1,s1:1},{x:220,y:60,w:20,h:268,c:'#a0522d'}],
+  steps:[{t:'drag',m:'Drag the drywall patch over the hole',o:{x:640,y:290,w:76,h:76,c:'#e9e7e2',l:''},to:{x:454,y:144,w:76,h:76},snd:'thud'},{t:'swipe',m:'Swipe mud over the patch edges',segs:[[440,182,544,182],[492,134,492,232]],w:30,c:'#f6f4ee',snd:'mud'},{t:'swipe',m:'Sand it smooth',segs:[[436,150,548,150],[436,214,548,214]],w:26,c:'rgba(255,255,255,.35)',snd:'roller'}]},
+ {id:'filter',lv:30,n:'Furnace filter',icon:'🌀',bg:'basement',complaint:'The house is dusty and the furnace runs all day.',diag:{q:'First thing to check?',o:['Air filter','Thermostat battery','Gas meter'],ok:0,why:'restricted airflow = long run times + dust'},
+  deco:[{x:420,y:60,w:160,h:270,c:'#6c757d'},{x:440,y:90,w:120,h:120,c:'#495057',l:'🔥'}],
+  steps:[{t:'tap',m:'Shut the furnace switch off first',it:[{x:640,y:110,n:'switch',l:'⏻'}],snd:'click'},{t:'drag',m:'Pull the clogged filter out',o:{x:430,y:250,w:140,h:22,c:'#6b5b3e'},to:{x:620,y:340,w:140,h:22},tol:90,snd:'whoosh'},
+   {t:'choice',m:'Arrow on the new filter should point…',o:['Toward the furnace','Away from the furnace'],ok:0,why:'the arrow follows airflow into the blower'},{t:'drag',m:'Slide the new filter in',o:{x:240,y:340,w:140,h:22,c:'#f1f1f1'},to:{x:430,y:250,w:140,h:22},snd:'whoosh'}]},
+ {id:'tile',lv:30,n:'Cracked floor tile',icon:'🔲',bg:'floor',complaint:'A dropped pan cracked one of my floor tiles.',diag:{q:'How do you replace one tile?',o:['Rake grout, pop tile, set new','Glue a tile on top','Caulk the crack'],ok:0,why:'a tile on top sits proud and trips people'},
+  deco:[{x:470,y:150,w:80,h:80,c:'#cfd6da',crack:1,s1:2}],
+  steps:[{t:'swipe',m:'Rake out the grout around the cracked tile',segs:[[470,150,550,150],[550,150,550,230],[550,230,470,230],[470,230,470,150]],w:12,c:'#555',snd:'mud'},{t:'tap',m:'Pop out the broken tile',it:[{x:510,y:190,n:'pry',l:'🔨'}],snd:'hammer'},
+   {t:'drag',m:'Set the new tile in thinset',o:{x:660,y:300,w:80,h:80,c:'#eef1f3'},to:{x:470,y:150,w:80,h:80},snd:'thud'},{t:'swipe',m:'Grout the joints',segs:[[470,150,550,150],[550,150,550,230],[550,230,470,230],[470,230,470,150]],w:12,c:'#9aa5ad',snd:'mud'}]},
+ {id:'door',lv:48,n:'Sticking door',icon:'🚪',bg:'wall',complaint:'My bedroom door scrapes the frame and won\'t latch.',diag:{q:'Likely cause?',o:['Loose top hinge screws','Door too short','Broken knob'],ok:0,why:'it rubs at the top latch side — the top hinge sags'},
+  deco:[{x:446,y:88,w:108,h:240,c:'#a0522d'},{x:446,y:96,w:10,h:36,c:'#d4af37'},{x:446,y:290,w:10,h:30,c:'#d4af37'},{x:534,y:200,w:12,h:12,c:'#ffd166',round:1}],
+  steps:[{t:'tap',m:'Drive 3" screws through the top hinge into the stud',it:[{x:451,y:104,n:'screw'},{x:451,y:124,n:'screw'}],snd:'screw'},{t:'tap',m:'Test it: tap the door to close',it:[{x:520,y:220,n:'close',l:'👋'}],snd:'click'}]},
+ {id:'tv',lv:60,n:'Mount a TV on studs',icon:'📺',bg:'wall',complaint:'Can you hang my 65" TV? It must NOT fall.',diag:{q:'What holds a 65" TV safely?',o:['Lag bolts into studs','Drywall anchors only','Picture hooks'],ok:0,why:'only wood studs carry that load'},
+  steps:[{t:'tap',m:'Scan with the stud finder — tap the 2 studs (16" apart)',hide:1,it:[{x:356,y:200,bad:'Hollow — no stud'},{x:404,y:200,n:'stud'},{x:428,y:200,bad:'Hollow — no stud'},{x:452,y:200,n:'stud'},{x:500,y:200,bad:'Hollow — no stud'}],snd:'screw'},
+   {t:'drag',m:'Hang the TV on the bracket',o:{x:600,y:290,w:160,h:90,c:'#111',l:'📺'},to:{x:348,y:110,w:160,h:90},snd:'clank'}]},
+ {id:'ptrap',lv:84,n:'Leaky P-trap',icon:'🚰',bg:'kitchen',complaint:'There\'s a puddle in the cabinet under my sink.',diag:{q:'Check first?',o:['Loose slip nuts on the trap','Roof leak','Dishwasher door'],ok:0,why:'drips start at the slip joints'},
+  steps:[{t:'drag',m:'Put a bucket under the trap',o:{x:660,y:320,w:60,h:50,c:'#4361ee',l:'🪣'},to:{x:470,y:300,w:60,h:50}},{t:'tap',m:'Hand-tighten each slip nut, top to bottom',ord:1,it:[{x:500,y:150,n:'1'},{x:470,y:230,n:'2'},{x:560,y:236,n:'3'}],snd:'clank'},{t:'tap',m:'Run water to test',it:[{x:640,y:70,n:'faucet',l:'🚰'}],snd:'water'}]},
+ {id:'fixture',lv:96,n:'Light fixture swap',icon:'💡',bg:'wall',complaint:'I bought a new ceiling light — can you put it up?',diag:{q:'First step?',o:['Kill the breaker','Just flip the wall switch','Wear rubber gloves'],ok:0,why:'a switch can be miswired — always kill the breaker'},
+  steps:[{t:'tap',m:'Shut off the breaker at the panel',it:[{x:262,y:150,n:'breaker',l:'⚡'}],snd:'click'},{t:'tap',m:'Confirm dead with the tester',it:[{x:500,y:70,n:'tester',l:'🔦'}],snd:'click'},{t:'tap',m:'Connect ground, then white, then black',ord:1,it:[{x:466,y:110,n:'ground',c:'#2a9d8f'},{x:500,y:110,n:'white',c:'#eee'},{x:534,y:110,n:'black',c:'#222'}],snd:'click'},
+   {t:'drag',m:'Mount the new fixture',o:{x:640,y:290,w:100,h:40,c:'#ffe066',l:'💡'},to:{x:450,y:60,w:100,h:40},snd:'light'}]},
+ {id:'caulk',lv:108,n:'Re-caulk the tub',icon:'🛁',bg:'bath',complaint:'The caulk around my tub is black and moldy.',diag:{q:'Right fix?',o:['Cut out old caulk & re-caulk','Caulk over it','Bleach & leave it'],ok:0,why:'new caulk won\'t stick to old moldy caulk'},
+  deco:[{x:230,y:254,w:540,h:90,c:'#fdfdfd'},{x:240,y:248,w:520,h:6,c:'#3b3b2b',s1:1}],
+  steps:[{t:'swipe',m:'Scrape out the old moldy caulk',segs:[[240,251,760,251]],w:16,c:'#e6f3f7',snd:'mud'},{t:'swipe',m:'Run a fresh silicone bead',segs:[[240,251,760,251]],w:16,c:'#ffffff',snd:'roller'}]},
+ {id:'flapper',lv:108,n:'Running toilet',icon:'🚽',bg:'bath',complaint:'My toilet keeps running all night.',diag:{q:'Most likely cause?',o:['Worn flapper','Bad wax ring','Clogged trap'],ok:0,why:'running water = the tank leaks into the bowl'},
+  deco:[{x:420,y:60,w:160,h:170,c:'#fdfdfd'},{x:430,y:90,w:140,h:130,c:'#a8dadc'},{x:440,y:230,w:120,h:100,c:'#f4f4f4'}],
+  steps:[{t:'tap',m:'Turn off the supply valve',it:[{x:620,y:300,n:'shutoff',l:'🔴'}],snd:'click'},{t:'tap',m:'Flush to drain the tank',it:[{x:430,y:76,n:'handle'}],snd:'water'},{t:'drag',m:'Fit the new flapper on the seat',o:{x:680,y:120,w:46,h:20,c:'#e63946'},to:{x:477,y:196,w:46,h:20},snd:'pop'},
+   {t:'tap',m:'Clip the chain with a little slack',it:[{x:470,y:120,n:'chain',l:'⛓'}],snd:'click'},{t:'tap',m:'Turn the water back on',it:[{x:620,y:300,n:'valve',l:'🟢'}],snd:'water'}]},
+ {id:'wax',lv:108,n:'Toilet leaks at base',icon:'🚽',bg:'bath',complaint:'Water seeps out under my toilet when it flushes.',diag:{q:'Cause?',o:['Failed wax ring','Worn flapper','Loose tank lid'],ok:0,why:'water at the floor = the seal under the bowl'},
+  deco:[{x:440,y:120,w:120,h:200,c:'rgba(0,0,0,0)',l:'🚽',s1:1,big:1}],
+  steps:[{t:'tap',m:'Remove both closet-bolt nuts',it:[{x:452,y:322},{x:548,y:322}],snd:'clank'},{t:'drag',m:'Lift the toilet off the flange',o:{x:440,y:120,w:120,h:200,c:'rgba(0,0,0,0)',l:'🚽'},to:{x:640,y:120,w:120,h:200},tol:100,snd:'thud'},
+   {t:'drag',m:'Set a new wax ring on the flange',o:{x:260,y:340,w:60,h:18,c:'#e9c46a'},to:{x:470,y:320,w:60,h:18},snd:'pop'},{t:'drag',rm:1,m:'Set the toilet back down, centered',o:{x:640,y:120,w:120,h:200,c:'rgba(0,0,0,0)',l:'🚽'},to:{x:440,y:120,w:120,h:200},snd:'thud'},{t:'tap',m:'Snug the nuts evenly',it:[{x:452,y:322},{x:548,y:322}],snd:'clank'}]},
+ {id:'tripped',lv:132,n:'Dead outlets',icon:'🔌',bg:'wall',complaint:'Half my bathroom & porch outlets just died.',diag:{q:'Most likely?',o:['An upstream GFCI tripped','The panel is broken','Outlets wore out'],ok:0,why:'GFCIs protect everything downstream'},
+  steps:[{t:'tap',m:'Find the GFCI that protects them (TEST/RESET buttons)',hide:1,it:[{x:300,y:260,bad:'Plain outlet — no RESET',l:'🔌'},{x:440,y:260,bad:'Plain outlet',l:'🔌'},{x:600,y:260,n:'GFCI',l:'🔲'},{x:730,y:260,bad:'Plain outlet',l:'🔌'}],snd:'click'},{t:'tap',m:'Press RESET',it:[{x:600,y:262,n:'RESET'}],snd:'click'},{t:'tap',m:'Test the dead outlet with a lamp',it:[{x:300,y:260,n:'lamp',l:'💡'}],snd:'light'}]},
+ {id:'gfci',lv:132,n:'Swap outlet for GFCI',icon:'⚡',bg:'kitchen',complaint:'The inspector says my sink outlet needs GFCI protection.',diag:{q:'Why GFCI by a sink?',o:['Water + shock risk — code','Looks nicer','Saves power'],ok:0,why:'GFCI trips in milliseconds on a ground fault'},
+  steps:[{t:'tap',m:'Breaker off first',it:[{x:262,y:150,n:'breaker',l:'⚡'}],snd:'click'},{t:'tap',m:'Feed to LINE: ground, white→silver, black→brass',ord:1,it:[{x:500,y:300,n:'ground',c:'#2a9d8f'},{x:420,y:150,n:'LINE silver',c:'#c0c0c0'},{x:580,y:150,n:'LINE brass',c:'#d4a017'},{x:580,y:240,bad:'That\'s LOAD — the feed goes on LINE',n:'LOAD',c:'#888'}],snd:'screw'},
+   {t:'tap',m:'Breaker on, then TEST, then RESET',ord:1,it:[{x:262,y:150,n:'breaker'},{x:500,y:186,n:'TEST'},{x:500,y:214,n:'RESET'}],snd:'click'}]}];
+function callsUnlocked(){return CALLS.filter(c=>c.lv<=Math.max(SAVE.story.max,0))}
+function hmCall(k){const U=callsUnlocked();if(!U.length)return CALLS[0];const r=rng(k*104729+7);if(k<=U.length)return U[k-1];return U[Math.floor(r()*U.length)]}
+// ===== COLLECTIBLES / STAR SHOP =====
+const ITEMS=[{id:'pal_design',cat:'Paint colors',n:'Designer palette',c:5,pal:['#6b705c','#a5a58d','#ffe8d6','#cb997e','#3d405b']},{id:'pal_bold',cat:'Paint colors',n:'Bold palette',c:12,pal:['#e63946','#ffb703','#219ebc','#8338ec','#06d6a0']},
+ {id:'hat_chrome',cat:'Hard hat',n:'Chrome hard hat',c:6,col:'#c0c0c0'},{id:'hat_camo',cat:'Hard hat',n:'Camo hard hat',c:12,col:'#4b5320'},{id:'hat_gold',cat:'Hard hat',n:'Gold hard hat',c:30,col:'#d4af37'},
+ {id:'belt_leather',cat:'Tool belt',n:'Leather tool belt',c:4,col:'#8b5a2b'},{id:'belt_hivis',cat:'Tool belt',n:'Hi-vis tool belt',c:10,col:'#c6f000'},
+ {id:'skin_gold',cat:'Tool skin',n:'Gold hammer & drill',c:15,col:'#d4af37'},{id:'skin_carbon',cat:'Tool skin',n:'Carbon-fiber tools',c:20,col:'#2b2b2b'},
+ {id:'truck_red',cat:'Truck',n:'Red pickup',c:15,col:'#c1121f'},{id:'truck_van',cat:'Truck',n:'Vintage van',c:25,col:'#2a9d8f'},
+ {id:'up_finder',cat:'Upgrade',n:'Pro stud finder',c:8,d:'Handyman: shows the right spot'},{id:'up_cards',cat:'Upgrade',n:'Business cards',c:20,d:'+10% cash on every level'},{id:'up_laser',cat:'Upgrade',n:'Laser level kit',c:18,d:'Owns laser level + tub kit tools'}];
+const CATS=['Paint colors','Hard hat','Tool belt','Tool skin','Truck','Upgrade'];
+const DEFAULT_COL={'Hard hat':'#ffb703','Tool belt':'#c9a66b','Tool skin':'#e76f51','Truck':'#f1f1f1'};
+const STORY_REWARDS={25:'belt_leather',50:'hat_chrome',100:'truck_red',150:'skin_carbon',250:'hat_camo',500:'hat_gold'};
+function owned(id){return !!SAVE.owned[id]}
+function equipCol(cat){const id=SAVE.equip[cat];const it=ITEMS.find(i=>i.id===id);return it&&it.col||DEFAULT_COL[cat]}
+function PAL(){const it=ITEMS.find(i=>i.id===SAVE.equip['Paint colors']);return it?it.pal:TH().paint}
+function starsTotal(){let s=0;for(const k in SAVE.hm)s+=SAVE.hm[k];return s}
+function starsAvail(){return starsTotal()-(SAVE.starsSpent||0)}
+function grant(id){if(!id||owned(id))return;SAVE.owned[id]=1;const it=ITEMS.find(i=>i.id===id);if(it&&it.cat!=='Upgrade'&&it.cat!=='Paint colors')SAVE.equip[it.cat]=id;if(id==='up_laser'){SAVE.tools[7]=SAVE.tools[11]=true}}
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function dailyLevel(ds=todayStr()){const seed=+ds.replace(/-/g,'');const L=genLevel(Math.max(12,Math.min(400,SAVE.story.max||12)),seed);return Object.assign({},L,{daily:ds,n:'Daily: '+L.n})}
+// ===== FLOW: levels, calls, before/after =====
+let CJ=null,CALLDEF=null,CALLCTX=null,CAPB=false,BEF_OK=false,REV=null,HMRES=null,SPAGE=0,HPAGE=0;
+function curJob(){return CJ||JOBS[SAVE.job||0]}
+const mkCap=()=>{const c=document.createElement('canvas');c.width=1280;c.height=800;return c};const BEF=mkCap(),AFT=mkCap();
+function capture(c){try{const s=cv.width/W,g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);g.drawImage(cv,SB*s,0,(W-SB)*s,H*s,0,0,c.width,c.height)}catch(e){}}
+function renderPlay(){const S=STAGES[cur];drawBackdrop();const k=TH().scale,o=stageOff();OFF=o;ctx.save();ctx.translate(SCX,SCY);ctx.scale(k,k);ctx.translate(-SCX,-SCY);
+ ctx.save();ctx.translate(o.x,o.y);S.draw();ctx.restore();OFF={x:0,y:0};ambientOcc();ctx.save();ctx.translate(o.x,o.y);drawParts(true);ctx.restore();ctx.restore();ctx.drawImage(LIGHT,0,0,W,H);hud()}
+function levelFromSave(){const c=SAVE.curLv;if(!c)return null;if(c.k==='daily')return dailyLevel(c.d);return genLevel(c.n)}
+function startLevel(L){CJ=L;SAVE.curLv=L.daily?{k:'daily',d:L.daily}:{k:'story',n:L.N};SAVE.results=[];SAVE.fine=0;SAVE.evDone={};SAVE.evBonus=0;BEF_OK=false;save();mode='map';SND.whoosh()}
+function startStage(i){cur=i;st={miss:0,tool:!!(SAVE.tools[i]||SAVE.temp[i])};if(SAVE.temp[i]){delete SAVE.temp[i];save()}t0=now();mode='play';parts=[];msg(STAGES[i].tip);STAGES[i].init();if(!BEF_OK)CAPB=true}
+function playStage(i){const ev=CJ&&CJ.events&&CJ.events[i];if(ev&&!SAVE.evDone[i])startCall({...EVENTS[ev],event:1},{kind:'event',next:i});else startStage(i)}
+function startCall(def,ctx2){CALLDEF=def;CALLCTX=ctx2;if(ctx2.kind==='hm')BEF_OK=false;if(ctx2.kind==='hm'){const CJp=CJ;CJ={th:def.bg==='bath'?1:2,lv:1,elec:1,n:def.n,icon:def.icon,stages:[16],mult:1};CALLCTX.prevCJ=CJp}startStage(16);STAGES[16].par=20+def.steps.length*10}
+function callDone(){const t=now()-t0,mi=st.miss;if(CALLCTX.kind==='event'){SAVE.evDone[CALLCTX.next]=1;SAVE.evBonus=(SAVE.evBonus||0)+25;save();SND.chime();buzz([15,30,15]);toast={t:now(),s:'Twist handled! +$25 bonus'};startStage(CALLCTX.next);msg(STAGES[cur].tip);return}
+ renderPlay();capture(AFT);const par=STAGES[16].par,stars=mi===0&&t<=par?3:mi<=2&&t<=par*2?2:1;const k=CALLCTX.k;const prev=SAVE.hm[k]||0;SAVE.hm[k]=Math.max(prev,stars);SAVE.hmMax=Math.max(SAVE.hmMax||0,k);
+ const cash=Math.round((30+stars*15+k*2)*(owned('up_cards')?1.1:1));SAVE.money+=cash;save();HMRES={k,stars,gain:Math.max(0,stars-prev),t,mi,cash,def:CALLDEF};CJ=CALLCTX.prevCJ||null;parts=[];REV={next:'hmres',t0:now(),x:.5,user:0,title:CALLDEF.n};mode='reveal';SND.star();buzz([20,40,60]);shake(3)}
+function finish(q,issues=[]){q=clamp(q,.2,1);const S=STAGES[cur];const t=now()-t0;const sp=clamp(S.par/Math.max(1,t),.5,1.2);
+ try{renderPlay();capture(AFT)}catch(e){}parts=[];const r={q,t,pay:Math.round((20+80*q*sp)*curJob().mult),issues};SND.chime();buzz([20,40,60]);shake(3);confetti(40);
+ if(INSPECT.includes(cur)){INS={stage:cur,r,issues};mode='inspect'}else commit(cur,r)}
+function goReveal(next){REV={next,t0:now(),x:.5,user:0,title:curJob().n};mode='reveal';SND.whoosh()}
+function payTotals(){const J=curJob();let sum=0,qs=0;J.stages.forEach(i=>{const r=SAVE.results[i]||{pay:0,q:0};sum+=r.pay;qs+=r.q});const avg=qs/J.stages.length;const bonus=Math.round((avg>.85?250:avg>.65?100:0)*J.mult*(owned('up_cards')?1.1:1))+(SAVE.evBonus||0);const fine=SAVE.fine||0;return{sum,bonus,avg,fine,total:sum+bonus-fine}}
+function bankIt(){const J=curJob(),P=payTotals();SAVE.money+=P.total;SAVE.jobs++;let note='';
+ if(J.daily){const d=SAVE.daily[J.daily]||{best:0,plays:0};d.best=Math.max(d.best,P.total);d.plays++;SAVE.daily[J.daily]=d;note='Daily score $'+P.total+(d.best===P.total?' — new best!':'')}
+ else{const N=J.N;const was=SAVE.story.max;SAVE.story.max=Math.max(was,N);if(N>was){if(STORY_REWARDS[N]){grant(STORY_REWARDS[N]);note='Collectible found: '+ITEMS.find(i=>i.id===STORY_REWARDS[N]).n+'!'}const nx=SKILLS.filter(k=>k.lv===N+1);if(nx.length)note='Next level teaches: '+nx.map(skillName).join(' + ');if(N===HANDYMAN_UNLOCK)note='🧰 HANDYMAN MODE unlocked!';if(MILESTONE[N]!=null){SAVE.done[MILESTONE[N]]=(SAVE.done[MILESTONE[N]]||0)+1}}}
+ SAVE.results=[];SAVE.fine=0;SAVE.curLv=null;SAVE.evDone={};SAVE.evBonus=0;save();const wasDaily=!!J.daily;CJ=null;mode=wasDaily?'daily':'story';if(!wasDaily)SPAGE=Math.floor(SAVE.story.max/40);SND.coin();if(note)toast={t:now(),s:note}}
+// ===== SCREENS =====
+const TB=[{x:30,y:262,w:142,h:56},{x:184,y:262,w:142,h:56},{x:338,y:262,w:142,h:56},{x:492,y:262,w:142,h:56},{x:646,y:262,w:142,h:56}];
+function drawTitle(){ctx.fillStyle='#ffb703';ctx.fillRect(0,0,W,H);for(let i=-10;i<30;i++){ctx.fillStyle='#2b2d42';ctx.beginPath();ctx.moveTo(i*40,370);ctx.lineTo(i*40+20,370);ctx.lineTo(i*40+50,400);ctx.lineTo(i*40+30,400);ctx.fill();ctx.beginPath();ctx.moveTo(i*40,0);ctx.lineTo(i*40+20,0);ctx.lineTo(i*40+50,30);ctx.lineTo(i*40+30,30);ctx.fill()}
+ txt('🔨',W/2,96,48);txt('BUILT TO CODE',W/2,154,38,'#2b2d42','center','900');txt('Construction Sim',W/2,182,18,'#2b2d42');
+ txt('Bank $'+SAVE.money+'  ·  Story level '+SAVE.story.max+'  ·  ★ '+starsAvail()+' stars',W/2,226,14,'#2b2d42','center','600');
+ const hm=SAVE.story.max>=HANDYMAN_UNLOCK;const L=[['STORY','Level '+(SAVE.story.max+1),'#2b2d42','#ffb703'],['HANDYMAN',hm?'★ '+starsTotal()+' earned':'🔒 Story lv '+HANDYMAN_UNLOCK,hm?'#2b2d42':'#7a6a3a','#fff'],['DAILY',todayStr(),'#2b2d42','#fff'],['TOOL WALL','★ star shop','#6d597a','#fff'],['TOOL SHOP','$ upgrades','#2a9d8f','#fff']];
+ L.forEach((b,i)=>{const R=TB[i];button(R,'',b[2]);txt(b[0],R.x+R.w/2,R.y+25,14,b[3],'center','800');txt(b[1],R.x+R.w/2,R.y+43,10,'#cfd3e6','center','400')})}
+function tileR(k){return{x:22+(k%10)*78,y:60+Math.floor(k/10)*70,w:72,h:64}}
+const NAVB=[{x:22,y:344,w:60,h:34,d:-10,l:'◀◀'},{x:88,y:344,w:60,h:34,d:-1,l:'◀'},{x:322,y:344,w:60,h:34,d:1,l:'▶'},{x:388,y:344,w:60,h:34,d:10,l:'▶▶'}],CURB={x:460,y:344,w:120,h:34};
+function nextSkill(){return SKILLS.find(k=>k.lv>SAVE.story.max+1)}
+function drawStory(){ctx.fillStyle='#f4ede1';ctx.fillRect(0,0,W,H);const ns=nextSkill();hdr('STORY MODE','Level '+SAVE.story.max+' reached · '+(ns?'next new skill: '+skillName(ns)+' at level '+ns.lv:'all skills learned — endless jobs!'));smallBtn(BACK,'◀ Home');
+ const base=SPAGE*40;for(let k=0;k<40;k++){const N=base+k+1,R=tileR(k),done=N<=SAVE.story.max,open=N<=SAVE.story.max+1;rr(R.x,R.y,R.w,R.h,6,N===SAVE.story.max+1?'#ffb703':done?'#d8f3dc':open?'#fff':'#e2dccf');
+  txt(N,R.x+6,R.y+15,11,open?'#2b2d42':'#aaa','left','800');if(!open){txt('🔒',R.x+R.w/2,R.y+44,14,'#999');continue}const L=genLevel(N);txt(L.icon,R.x+R.w/2,R.y+42,20,'#000');
+  if(L.milestone)txt('★',R.x+R.w-6,R.y+15,12,'#e09f3e','right','800');else if(L.fresh.length)txt('NEW',R.x+R.w-5,R.y+14,8,'#e76f51','right','800');if(done)txt('✔',R.x+R.w-6,R.y+R.h-6,11,'#2a9d8f','right','800');txt(L.stages.length+' job'+(L.stages.length>1?'s':''),R.x+6,R.y+R.h-6,8,'#666','left','400')}
+ for(const b of NAVB)button(b,b.l,'#2b2d42');txt('Levels '+(base+1)+'–'+(base+40),235,366,13,'#2b2d42','center','700');button(CURB,'▶ Level '+(SAVE.story.max+1),'#ffb703','#2b2d42',12);
+ drawTruck(640,346,equipCol('Truck'));txt('★ milestone · NEW = new skill',W-14,392,9,'#888','right','400')}
+function drawTruck(x,y,c){rr(x,y+8,110,24,4,c);rr(x+70,y,40,16,3,c);ctx.fillStyle='#bde0fe';ctx.fillRect(x+76,y+3,28,10);ctx.fillStyle='#222';for(const wx of [x+22,x+88]){ctx.beginPath();ctx.arc(wx,y+34,8,0,7);ctx.fill()}txt('BUILT TO CODE',x+36,y+24,7,'#2b2d42','center','800')}
+function drawMap(){const J=curJob();ctx.fillStyle='#f4ede1';ctx.fillRect(0,0,W,H);const tag=J.daily?'DAILY CHALLENGE · ':J.milestone?'★ MILESTONE · ':'LEVEL '+J.N+' · ';hdr(J.icon+' '+J.n,tag+'Client: '+(J.client||'—')+' · pay ×'+J.mult);smallBtn(BACK,J.daily?'◀ Daily':'◀ Levels');smallBtn(SHOPB,'🛠 Shop','#2a9d8f');
+ const nx=nextIdx();let tot=0;const n=J.stages.length,rh=Math.min(40,190/Math.ceil(n/2));
+ if(J.d)txt(J.d,W/2,74,12,'#555','center','400');if(J.fresh&&J.fresh.length){rr(W/2-200,82,400,26,13,'#e76f51');txt('✨ NEW SKILL: '+J.fresh.join(' + ')+' — tutorial hints on',W/2,100,12,'#fff','center','800')}
+ J.stages.forEach((i,k)=>{const S=STAGES[i],per=Math.ceil(n/2),c=Math.floor(k/per),r0=k%per,R={x:12+c*402,y:116+r0*rh,w:394,h:rh-5},r=SAVE.results[i];const open=r||i===nx;rr(R.x,R.y,R.w,R.h,6,i===nx?'#ffb703':r?'#fff':'#e2dccf');
+  const cy=R.y+R.h/2+5,fz=Math.min(14,R.h-12);txt(S.icon,R.x+18,cy,fz,'#000');txt(S.name+(i===3?' ('+['basic','GFCI','3-way'][J.elec||0]+')':'')+(INSPECT.includes(i)?'  📋':'')+(SAVE.tools[i]?'  🔧':''),R.x+36,cy,fz,open?'#2b2d42':'#999','left','700');
+  if(r){tot+=r.pay;txt('$'+r.pay,R.x+R.w-12,cy,14,'#2a9d8f','right','800')}else txt(i===nx?'▶ GO':'🔒',R.x+R.w-12,cy,13,'#2b2d42','right','800')});
+ txt('Earned: $'+tot+(SAVE.evBonus?' + $'+SAVE.evBonus+' twist bonus':''),16,H-26,12,'#2b2d42','left');txt('Easy mode: no stars needed to progress',W-16,H-26,10,'#666','right','400');
+ if(nx<0)button(MAPBTN,'📋 FINAL WALKTHROUGH','#2a9d8f','#fff',16);else button(MAPBTN,'START: '+STAGES[nx].name.toUpperCase(),'#2b2d42','#ffb703',15)}
+function drawHandyman(){ctx.fillStyle='#eef2f3';ctx.fillRect(0,0,W,H);hdr('HANDYMAN — SERVICE CALLS','★ '+starsTotal()+' earned · '+starsAvail()+' to spend · '+callsUnlocked().length+'/'+CALLS.length+' call types learned');smallBtn(BACK,'◀ Home');smallBtn({x:W-150,y:12,w:140,h:28},'★ Tool wall','#6d597a');
+ if(SAVE.story.max<HANDYMAN_UNLOCK){rr(160,120,500,140,10,'#fff');txt('🔒 Handyman mode',410,160,20,'#2b2d42','center','800');txt('Finish story level '+HANDYMAN_UNLOCK+' to learn enough skills.',410,196,13,'#555','center','400');txt('You are on level '+(SAVE.story.max+1)+'.',410,222,13,'#555','center','400');return}
+ const base=HPAGE*40;for(let k=0;k<40;k++){const N=base+k+1,R=tileR(k),open=N<=(SAVE.hmMax||0)+1,s=SAVE.hm[N]||0;rr(R.x,R.y,R.w,R.h,6,N===(SAVE.hmMax||0)+1?'#ffb703':s?'#fff':open?'#fff':'#dfe3e6');txt(N,R.x+6,R.y+15,11,open?'#2b2d42':'#aaa','left','800');
+  if(!open){txt('🔒',R.x+R.w/2,R.y+44,14,'#999');continue}txt(hmCall(N).icon,R.x+R.w/2,R.y+40,18,'#000');txt('★'.repeat(s)+'☆'.repeat(3-s),R.x+R.w/2,R.y+R.h-6,11,'#e09f3e','center','800')}
+ for(const b of NAVB)button(b,b.l,'#2b2d42');txt('Calls '+(base+1)+'–'+(base+40),235,366,13,'#2b2d42','center','700');button(CURB,'▶ Call '+((SAVE.hmMax||0)+1),'#ffb703','#2b2d42',12);
+ txt('1–3 stars per call: no mistakes + fast = ★★★. Stars buy tools, colors & skins.',W-14,392,9,'#666','right','400')}
+function drawHmRes(){const R=HMRES;ctx.fillStyle='#264653';ctx.fillRect(0,0,W,H);txt(R.def.icon+'  CALL '+R.k+' COMPLETE',W/2,60,22,'#fff','center','900');txt(R.def.n,W/2,90,15,'#ffb703','center','700');
+ const e=Math.min(1,(now()-(R.at||(R.at=now())))/1.2);for(let i=0;i<3;i++){const on=i<R.stars&&e>i/3;txt(on?'★':'☆',W/2-90+i*90,190,on?72:60,on?'#ffd166':'#5b7380','center','900')}
+ txt('Time '+R.t.toFixed(0)+'s  ·  Mistakes '+R.mi+'  ·  +$'+R.cash+(R.gain?'  ·  +'+R.gain+' ★':''),W/2,250,14,'#fff','center','400');txt('★★★ = no mistakes & under '+STAGES[16].par+'s',W/2,274,11,'#a8c5d1','center','400');
+ button({x:W/2-250,y:310,w:240,h:46},'◀ CALL LIST','#2b2d42');button({x:W/2+10,y:310,w:240,h:46},'NEXT CALL ▶','#ffb703','#2b2d42')}
+function drawDaily(){ctx.fillStyle='#f4ede1';ctx.fillRect(0,0,W,H);const ds=todayStr(),L=dailyLevel(ds),d=SAVE.daily[ds];hdr('DAILY CHALLENGE','One seeded job per calendar day · '+ds);smallBtn(BACK,'◀ Home');
+ rr(30,66,430,280,8,'#fff');txt(L.icon+' '+L.n.replace('Daily: ',''),50,100,17,'#2b2d42','left','800');wrap(L.d,50,124,390,12,'#555',16,'left',2);txt('Trades: '+L.stages.map(i=>STAGES[i].name).join(', '),50,170,11,'#2a9d8f','left','700');txt('Twists: '+Object.keys(L.events).length+' surprise event(s)',50,190,11,'#e76f51','left','700');
+ txt('Today\'s best: '+(d?'$'+d.best+' ('+d.plays+' play'+(d.plays>1?'s':'')+')':'—'),50,226,14,'#2b2d42','left','800');button({x:50,y:270,w:390,h:50},'▶ PLAY TODAY\'S JOB','#2b2d42','#ffb703',16);
+ rr(480,66,310,280,8,'#fff');txt('LOCAL LEADERBOARD',635,92,13,'#2b2d42','center','800');const ks=Object.keys(SAVE.daily).sort().reverse().slice(0,8);ks.forEach((k,i)=>{txt(k,500,122+i*24,12,'#2b2d42','left',k===ds?'800':'400');txt('$'+SAVE.daily[k].best,770,122+i*24,12,'#2a9d8f','right','800')});if(!ks.length)txt('No scores yet',635,140,12,'#888','center','400');
+ txt('Scores are saved on this device only — an online leaderboard needs a backend.',W/2,372,10,'#888','center','400')}
+function wallCard(c,r){return{x:14+c*134,y:96+r*96,w:126,h:88}}
+function drawWall(){ctx.fillStyle='#c9a66b';ctx.fillRect(0,0,W,H);ctx.fillStyle='#b08d57';for(let y=70;y<H;y+=16)for(let x=8;x<W;x+=16){ctx.beginPath();ctx.arc(x,y,1.6,0,7);ctx.fill()}
+ hdr('TOOL WALL & STAR SHOP','★ '+starsAvail()+' stars to spend (earn them on handyman calls) · tap to buy or equip');smallBtn(BACK,'◀ Back');
+ CATS.forEach((cat,c)=>{txt(cat.toUpperCase(),14+c*134+63,84,10,'#2b2d42','center','800');ITEMS.filter(i=>i.cat===cat).forEach((it,r)=>{const R=wallCard(c,r),own=owned(it.id),eq=SAVE.equip[cat]===it.id;rr(R.x,R.y,R.w,R.h,6,eq?'#fff7d6':own?'#fff':'rgba(255,255,255,.55)');
+  const cx=R.x+R.w/2,cy=R.y+30;ctx.globalAlpha=own?1:.45;if(it.pal)it.pal.forEach((p,i)=>rr(R.x+14+i*20,cy-12,18,24,3,p));else if(cat==='Hard hat'){ctx.fillStyle=it.col;ctx.beginPath();ctx.arc(cx,cy+8,20,Math.PI,0);ctx.fill();ctx.fillRect(cx-26,cy+6,52,5)}
+  else if(cat==='Tool belt'){rr(cx-40,cy-4,80,14,3,it.col);rr(cx-12,cy-6,24,18,3,'#888')}else if(cat==='Tool skin'){rr(cx-6,cy-16,12,34,3,it.col);rr(cx-20,cy-18,40,12,3,it.col)}else if(cat==='Truck'){ctx.save();ctx.translate(cx-38,cy-18);ctx.scale(.7,.7);drawTruck(0,0,it.col);ctx.restore()}else txt('🔧',cx,cy+8,24,'#000');ctx.globalAlpha=1;
+  wrap(it.n,cx,R.y+64,R.w-10,9.5,'#2b2d42',11,'center',2);txt(eq?'EQUIPPED':own?(cat==='Upgrade'?'OWNED':'tap to equip'):'★ '+it.c,cx,R.y+R.h-4,10,eq?'#2a9d8f':own?'#888':starsAvail()>=it.c?'#e09f3e':'#999','center','800')})})}
+function drawReveal(){const R=REV;ctx.fillStyle='#1b1e22';ctx.fillRect(0,0,W,H);const X0=24,Y0=24,IW=560,IH=350;if(!R.user){const e=Math.min(1,(now()-R.t0)/1.6);R.x=1-.5*(1-Math.pow(1-e,3))}
+ const sx=X0+IW*clamp(R.x,0,1);ctx.drawImage(AFT,X0,Y0,IW,IH);ctx.save();ctx.beginPath();ctx.rect(X0,Y0,sx-X0,IH);ctx.clip();ctx.drawImage(BEF,X0,Y0,IW,IH);ctx.restore();
+ ctx.fillStyle='#fff';ctx.fillRect(sx-1.5,Y0,3,IH);ctx.beginPath();ctx.arc(sx,Y0+IH/2,16,0,7);ctx.fill();txt('◀▶',sx,Y0+IH/2+4,10,'#2b2d42');
+ rr(X0+8,Y0+8,64,20,10,'rgba(0,0,0,.6)');txt('BEFORE',X0+40,Y0+22,10,'#fff');rr(X0+IW-72,Y0+8,64,20,10,'rgba(0,0,0,.6)');txt('AFTER',X0+IW-40,Y0+22,10,'#ffb703');
+ txt('BEFORE / AFTER',700,70,18,'#ffb703','center','900');wrap(R.title,700,100,200,13,'#fff',17,'center',3);txt('Drag the slider ◀▶',700,170,12,'#cfd3e6','center','400');button({x:610,y:300,w:180,h:50},'CONTINUE ▶','#ffb703','#2b2d42',16)}
 // ---------- input ----------
 function pt(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)/scale,y:(e.clientY-r.top)/scale}}
 function stageOff(){const S=STAGES[cur];return(S&&S.off)||{x:0,y:0}}
 function toStage(p){const k=TH().scale,o=stageOff();return{x:(p.x-SCX)/k+SCX-o.x,y:(p.y-SCY)/k+SCY-o.y}}
 function toScreen(p){const k=TH().scale,o=stageOff();return{x:(p.x+o.x-SCX)*k+SCX,y:(p.y+o.y-SCY)*k+SCY}}
+function nav(p,get,set,max){for(const b of NAVB)if(btn(p,b)){set(clamp(get()+b.d,0,Math.max(0,Math.floor(max/40))));SND.click();return true}return false}
+const HMWALL={x:W-150,y:12,w:140,h:28};
 cv.addEventListener('pointerdown',e=>{e.preventDefault();if(AD)return;down=true;downSide=false;const p=pt(e);last=p;
- if(mode==='title'){if(btn(p,START))mode='career';return}
- if(mode==='career'){if(btn(p,CAREER_SHOP)){prevMode='career';mode='shop';return}
-  JOBS.forEach((J,i)=>{if(i<=SAVE.unlocked&&btn(p,cardR(i))){if(SAVE.job!==i){SAVE.job=i;SAVE.results=[];SAVE.fine=0;save()}mode='map'}});return}
+ if(mode==='title'){const i=TB.findIndex(b=>btn(p,b));if(i<0)return;SND.click();buzz(8);
+  if(i===0){mode='story';SPAGE=Math.floor(SAVE.story.max/40)}else if(i===1){mode='handyman';HPAGE=Math.floor((SAVE.hmMax||0)/40)}else if(i===2)mode='daily';else if(i===3){prevMode='title';mode='wall'}else{prevMode='title';mode='shop'}return}
+ if(mode==='story'){if(btn(p,BACK)){mode='title';return}if(nav(p,()=>SPAGE,v=>SPAGE=v,SAVE.story.max+1e6))return;if(btn(p,CURB)){const N=SAVE.story.max+1;SPAGE=Math.floor((N-1)/40);startLevel(genLevel(N));return}
+  for(let k=0;k<40;k++){const N=SPAGE*40+k+1;if(btn(p,tileR(k))&&N<=SAVE.story.max+1){const c=SAVE.curLv;if(CJ&&c&&c.k==='story'&&c.n===N){mode='map'}else startLevel(genLevel(N));return}}return}
+ if(mode==='handyman'){if(btn(p,BACK)){mode='title';return}if(btn(p,HMWALL)){prevMode='handyman';mode='wall';return}if(SAVE.story.max<HANDYMAN_UNLOCK)return;if(nav(p,()=>HPAGE,v=>HPAGE=v,(SAVE.hmMax||0)+1e6))return;
+  const go=N=>startCall(hmCall(N),{kind:'hm',k:N});if(btn(p,CURB)){go((SAVE.hmMax||0)+1);return}for(let k=0;k<40;k++){const N=HPAGE*40+k+1;if(btn(p,tileR(k))&&N<=(SAVE.hmMax||0)+1){go(N);return}}return}
+ if(mode==='hmres'){if(btn(p,{x:W/2-250,y:310,w:240,h:46})){mode='handyman';return}if(btn(p,{x:W/2+10,y:310,w:240,h:46})){startCall(hmCall(HMRES.k+1),{kind:'hm',k:HMRES.k+1})}return}
+ if(mode==='daily'){if(btn(p,BACK)){mode='title';return}if(btn(p,{x:50,y:270,w:390,h:50}))startLevel(dailyLevel());return}
+ if(mode==='wall'){if(btn(p,BACK)){mode=prevMode||'title';return}CATS.forEach((cat,c)=>ITEMS.filter(i=>i.cat===cat).forEach((it,r)=>{if(!btn(p,wallCard(c,r)))return;
+   if(owned(it.id)){if(cat!=='Upgrade'){SAVE.equip[cat]=SAVE.equip[cat]===it.id?null:it.id;save();SND.click()}}else if(starsAvail()>=it.c){SAVE.starsSpent=(SAVE.starsSpent||0)+it.c;grant(it.id);if(cat==='Paint colors')SAVE.equip[cat]=it.id;save();SND.star();confetti(30);toast={t:now(),s:'Unlocked '+it.n+'!'}}else{SND.error();toast={t:now(),s:'Need ★'+it.c+' — earn stars on handyman calls'}}}));return}
+ if(mode==='reveal'){if(btn(p,{x:610,y:300,w:180,h:50})){mode=REV.next;SND.coin();return}if(inR(p,24,24,560,350)){REV.user=1;REV.x=(p.x-24)/560}return}
  if(mode==='shop'){if(btn(p,BACK)){mode=prevMode;return}if(btn(p,ADSB)&&!SAVE.noAds){Monetize.buyRemoveAds();return}
   for(let i=0;i<TOOLS.length;i++){const R=shopRow(i);if(SAVE.tools[i])continue;
    if(inR(p,R.x+R.w-130,R.y+6,60,24)){if(SAVE.money>=TOOLS[i][2]){SAVE.money-=TOOLS[i][2];SAVE.tools[i]=true;delete SAVE.temp[i];save();sfx(880,.2);toast={t:now(),s:'Bought '+TOOLS[i][1]+'!'}}else{toast={t:now(),s:'Need $'+TOOLS[i][2]};sfx(150)}return}
    if(inR(p,R.x+R.w-64,R.y+6,56,24)&&!SAVE.temp[i]){Monetize.showRewarded('tool_trial_'+i,()=>{SAVE.temp[i]=1;save();toast={t:now(),s:TOOLS[i][1]+' ready for 1 job!'}});return}}return}
- if(mode==='map'){const nx=nextIdx(),J=curJob();if(btn(p,BACK)){mode='career';return}if(btn(p,SHOPB)){prevMode='map';mode='shop';return}
-  if(btn(p,MAPBTN)){if(nx<0){INS={final:true,issues:finalIssues()};mode='inspect'}else startStage(nx);return}
-  J.stages.forEach((i,k)=>{if(btn(p,mapRow(k,J.stages.length))&&(SAVE.results[i]||i===nx))startStage(i)});return}
+ if(mode==='map'){const nx=nextIdx(),J=curJob();if(btn(p,BACK)){mode=J.daily?'daily':'story';return}if(btn(p,SHOPB)){prevMode='map';mode='shop';return}
+  if(btn(p,MAPBTN)){if(nx<0){INS={final:true,issues:finalIssues()};mode='inspect'}else playStage(nx);return}
+  const n=J.stages.length,per=Math.ceil(n/2),rh=Math.min(40,190/per);J.stages.forEach((i,k)=>{const c=Math.floor(k/per),r0=k%per;if(inR(p,12+c*402,116+r0*rh,394,rh-5)&&(SAVE.results[i]||i===nx))playStage(i)});return}
  if(mode==='inspect'){const I=INS,fail=I.issues.length>0;
-  if(!fail){if(btn(p,IB[1])){if(I.final){SAVE.fine=0;mode='pay'}else commit(I.stage,I.r)}return}
+  if(!fail){if(btn(p,IB[1])){if(I.final){SAVE.fine=0;goReveal('pay')}else commit(I.stage,I.r)}return}
   if(!I.final&&btn(p,IB[0])){startStage(I.stage);return}
-  if(btn(p,IB[1])){if(I.final){SAVE.fine=Math.round((payTotals().sum)*.15);save();mode='pay'}else{I.r.pay=Math.round(I.r.pay*.7);I.r.pen=1;commit(I.stage,I.r)}return}
-  if(btn(p,IB[2]))Monetize.showRewarded('skip_reinspection',()=>{if(I.final){SAVE.fine=0;mode='pay'}else{I.r.issues=[];commit(I.stage,I.r)}});return}
- if(mode==='pay'){if(btn(p,PAYBTN)){const j=SAVE.job||0;SAVE.money+=payTotals().total;SAVE.jobs++;SAVE.done[j]=(SAVE.done[j]||0)+1;SAVE.unlocked=Math.max(SAVE.unlocked,Math.min(JOBS.length-1,j+1));SAVE.results=[];SAVE.fine=0;save();mode='career'}return}
+  if(btn(p,IB[1])){if(I.final){SAVE.fine=Math.round((payTotals().sum)*.15);save();goReveal('pay')}else{I.r.pay=Math.round(I.r.pay*.7);I.r.pen=1;commit(I.stage,I.r)}return}
+  if(btn(p,IB[2]))Monetize.showRewarded('skip_reinspection',()=>{if(I.final){SAVE.fine=0;goReveal('pay')}else{I.r.issues=[];commit(I.stage,I.r)}});return}
+ if(mode==='pay'){if(btn(p,PAYBTN))bankIt();return}
  if(mode!=='play')return;
- if(p.x<SB){downSide=true;if(btn(p,BACKP)){mode='map';return}for(const c of ctrlList())if(btn(p,c)){sfx(420,.03);c.f();return}return}
+ if(p.x<SB){downSide=true;if(btn(p,BACKP)){mode=cur===16&&CALLCTX&&CALLCTX.kind==='hm'?(CJ=CALLCTX.prevCJ||null,'handyman'):'map';return}for(const c of ctrlList())if(btn(p,c)){sfx(420,.03);c.f();return}return}
  const q=toStage(p);last=q;const S=STAGES[cur];S.down&&S.down(q)});
-cv.addEventListener('pointermove',e=>{e.preventDefault();if(!down||AD||downSide)return;let p=pt(e);if(mode==='play'){p=toStage(p);const S=STAGES[cur];S.move&&S.move(p,last)}last=p});
+cv.addEventListener('pointermove',e=>{e.preventDefault();if(!down||AD||downSide)return;let p=pt(e);if(mode==='reveal'&&inR(p,24,24,560,350)){REV.user=1;REV.x=(p.x-24)/560;return}if(mode==='play'){p=toStage(p);const S=STAGES[cur];S.move&&S.move(p,last)}last=p});
 addEventListener('pointerup',()=>{if(!down)return;down=false;if(downSide){downSide=false;return}if(mode==='play'){const S=STAGES[cur];S.up&&S.up(last)}});
-function drawParts(){for(const p of parts){ctx.globalAlpha=Math.max(0,p.l);ctx.fillStyle=p.c;ctx.fillRect(p.x,p.y,4,4);p.x+=p.vx;p.y+=p.vy;p.vy+=.1;p.l-=.03}ctx.globalAlpha=1;parts=parts.filter(p=>p.l>0)}
+function drawParts(){for(const p of parts){ctx.globalAlpha=Math.max(0,Math.min(1,p.l));ctx.fillStyle=p.c;if(p.big){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.l*6);ctx.fillRect(-4,-2,8,4);ctx.restore()}else ctx.fillRect(p.x,p.y,4,4);p.x+=p.vx;p.y+=p.vy;p.vy+=p.big?.05:.1;p.l-=p.big?.012:.03}ctx.globalAlpha=1;parts=parts.filter(p=>p.l>0&&p.y<H+20)}
 // ---------- loop ----------
-let lt=now();function loop(){const t=now(),dt=Math.min(.05,t-lt);lt=t;ctx.clearRect(0,0,W,H);Monetize._tick();
+let lt=now(),FT=[];function loop(){const t=now(),dt=Math.min(.05,t-lt);FT.push(t-lt);if(FT.length>120)FT.shift();lt=t;ctx.clearRect(0,0,W,H);Monetize._tick();
+ ctx.save();if(SHAKE>.2){ctx.translate((Math.random()-.5)*SHAKE*2,(Math.random()-.5)*SHAKE*2);SHAKE*=.86}else SHAKE=0;
  if(mode==='title')drawTitle();else if(mode==='career')drawCareer();else if(mode==='shop')drawShop();else if(mode==='map')drawMap();else if(mode==='inspect')drawInspect();else if(mode==='pay')drawPay();
- else{const S=STAGES[cur];S.tick&&S.tick(dt);if(mode==='play'){drawBackdrop();const k=TH().scale,o=stageOff();OFF=o;ctx.save();ctx.translate(SCX,SCY);ctx.scale(k,k);ctx.translate(-SCX,-SCY);
-   ctx.save();ctx.translate(o.x,o.y);S.draw();ctx.restore();OFF={x:0,y:0};ambientOcc();ctx.save();ctx.translate(o.x,o.y);drawParts();ctx.restore();ctx.restore();ctx.drawImage(LIGHT,0,0,W,H);if(mode==='play')hud()}}
- if(mode!=='play')drawParts();
- if(toast&&now()-toast.t<2.5){rr(W/2-160,H/2-25,320,50,8,'rgba(42,157,143,.95)');txt(toast.s,W/2,H/2+6,15)}
+ else if(mode==='story')drawStory();else if(mode==='handyman')drawHandyman();else if(mode==='hmres')drawHmRes();else if(mode==='daily')drawDaily();else if(mode==='wall')drawWall();else if(mode==='reveal')drawReveal();
+ else{const S=STAGES[cur];S.tick&&S.tick(dt);if(mode==='play'){renderPlay();if(CAPB){capture(BEF);CAPB=false;BEF_OK=true}}}
+ if(mode!=='play')drawParts();ctx.restore();
+ if(toast&&now()-toast.t<2.8&&mode!=='reveal'){ctx.font='600 14px Helvetica';const tw=Math.max(320,ctx.measureText(toast.s).width+40);rr(W/2-tw/2,H/2-25,tw,50,8,'rgba(42,157,143,.95)');txt(toast.s,W/2,H/2+6,14)}
  if(AD)drawAd();
  requestAnimationFrame(loop)}
 try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{})}catch(e){}
-// Testing: ?stage=1..11 trades, 13..17 fixtures (tub,toilet,vanity,kitchen,fan); ?stage=0 job map; ?stage=12 payday w/ sample results; ?job=0|1|2 theme/job; ?money=N
-const Q=new URLSearchParams(location.search),qs=Q.get('stage');if(Q.get('job')!==null)SAVE.job=+Q.get('job');if(Q.get('money')){SAVE.money=+Q.get('money');save()}
+// restore an in-progress level
+{const L=levelFromSave();if(L)CJ=L;else if(SAVE.results.some(r=>r)){SAVE.results=[]}}
+// Testing: ?stage=1..11 trades, 13..17 fixtures; ?stage=0 map; ?stage=12 payday; ?job=N (classic job theme); ?money=N; ?story=N (set progress); ?level=N; ?call=id; ?screen=story|handyman|daily|wall
+const Q=new URLSearchParams(location.search),qs=Q.get('stage');if(Q.get('job')!==null){SAVE.job=+Q.get('job');CJ=null}if(Q.get('money')){SAVE.money=+Q.get('money');save()}
+if(Q.get('story')){SAVE.story.max=+Q.get('story');save()}if(Q.get('stars')){SAVE.hm[0]=+Q.get('stars');save()}
+if(Q.get('level'))startLevel(genLevel(+Q.get('level')));if(Q.get('call'))startCall(CALLS.find(c=>c.id===Q.get('call')),{kind:'hm',k:1});if(Q.get('screen'))mode=Q.get('screen');
 if(qs!==null){const n=+qs;if(n===0)mode='map';else if(n===12){curJob().stages.forEach(i=>SAVE.results[i]={q:.8+(i%3)*.07,t:STAGES[i].par,pay:80+i*3,issues:[]});mode='pay'}else if(n>=1&&n<=11)startStage(n-1);else if(n>12&&n<=17)startStage(n-2)}
-window.__game={STAGES,JOBS,get st(){return st},get mode(){return mode},get INS(){return INS},finish,SAVE,Monetize,toScreen,ctrls:()=>ctrlList().map(c=>({l:c.l,x:c.x+c.w/2,y:c.y+c.h/2})),W,H,startStage};
+window.__game={STAGES,JOBS,get st(){return st},get mode(){return mode},get INS(){return INS},get CJ(){return CJ},get cur(){return cur},get REV(){return REV},get HMRES(){return HMRES},finish,SAVE,Monetize,toScreen,ctrls:()=>ctrlList().map(c=>({l:c.l,x:c.x+c.w/2,y:c.y+c.h/2})),W,H,startStage,genLevel,startLevel,startCall,playStage,CALLS,EVENTS,hmCall,dailyLevel,SKILLS,fps:()=>FT.reduce((a,b)=>a+b,0)/FT.length*1000,BEF,AFT};
 loop();
 </script></body></html>
