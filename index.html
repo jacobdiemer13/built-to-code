@@ -72,15 +72,19 @@ function ambientOcc(){if(!WALLSTAGES.includes(cur))return;const s=16;let g=ctx.c
 const SHADOWED=new Set(['#fdfdfd','#f4f4f4','#e9e7e2','#d6b47c','#cfe3d4','#588157','#6d597a','#e9c46a','#ced4da','#a0522d','#9b2226','#fafafa']);
 
 // ---------- save ----------
-const KEY='diemer-jobsite-v2';
+const KEY='built-to-code-career-v3';
 let SAVE;try{SAVE=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 SAVE=Object.assign({money:0,jobs:0,results:[],tools:{},temp:{},noAds:false,job:0,unlocked:0,done:{},fine:0},SAVE||{});if(!Array.isArray(SAVE.results))SAVE.results=[];
 // ---------- career ----------
-const JOBS=[{n:'Backyard Shed',icon:'🛖',mult:1,stages:[0,1,7,8,10],d:'8×10 shed on a slab'},
- {n:'Bathroom Remodel',icon:'🛁',mult:1.6,stages:[2,11,3,5,6,7,8,9,10,12,13],d:'Gut & rebuild a full bath'},
- {n:'New House',icon:'🏠',mult:2.5,stages:[0,1,2,11,3,4,5,6,7,8,9,10,12,13,14,15],d:'Every trade + bath & kitchen fixtures'}];
+const COMPANY='YOUR COMPANY · BUILT TO CODE';
+// Career: difficulty ramps job to job. elec = electrical level (0 guided outlet + single-pole, 1 GFCI + single-pole, 2 GFCI + 3-way). lv = general difficulty for other trades.
+const JOBS=[{n:'Backyard Shed',icon:'🛖',mult:1,stages:[0,1,7,8,10],d:'8×10 shed on a slab',th:0,lv:0,elecLabel:'No electrical'},
+ {n:'Bathroom Remodel',icon:'🛁',mult:1.6,stages:[2,11,3,5,6,7,8,9,10,12,13],d:'Gut & rebuild a full bath',th:1,lv:0,elec:0,room:'bathroom',elecLabel:'⚡ Basic: outlet + light switch (guided)'},
+ {n:'Kitchen Remodel',icon:'🍳',mult:1.9,stages:[2,3,5,6,9,14,8,10],d:'New cabinets, sink & circuits',th:2,lv:1,elec:1,room:'kitchen',elecLabel:'⚡⚡ GFCI + outlets + switch'},
+ {n:'Basement Finish',icon:'🧰',mult:2.2,stages:[1,3,4,5,6,7,9,15,8,10],d:'Frame, wire, duct & finish',th:2,lv:1,elec:1,room:'basement',elecLabel:'⚡⚡ GFCI + switch, no auto-hints'},
+ {n:'New House',icon:'🏠',mult:2.8,stages:[0,1,2,11,3,4,5,6,7,8,9,10,12,13,14,15],d:'Every trade + bath & kitchen fixtures',th:2,lv:2,elec:2,room:'bathroom',elecLabel:'⚡⚡⚡ 3-way switches + GFCI'}];
 const INSPECT=[1,2,3,4,11,12,13,14,15];
-const CHECKS={11:['Tub level','Drain & overflow sealed'],12:['Centered on flange','Bolts even & snug','Porcelain intact','Supply connected'],13:['Vanity level','P-trap','Hot left / cold right'],14:['Cabinets level','Sink drain & disposal','Dishwasher high loop'],15:['Fan-rated box','Splices','Blade balance'],1:['Studs 16" on center','Header over opening','Plates nailed off'],2:['Drain connections','Drain slope ¼"/ft'],3:['Breaker sized to wire','3-way switching','Polarity','Grounds bonded','Neutrals unswitched'],4:['Supply air to every room','Return air to every room'],F:['Slab & framing','Seams finished','Floor stagger','Paint coverage','Doors & trim']};
+const CHECKS={11:['Tub level','Drain & overflow sealed'],12:['Centered on flange','Bolts even & snug','Porcelain intact','Supply connected'],13:['Vanity level','P-trap','Hot left / cold right'],14:['Cabinets level','Sink drain & disposal','Dishwasher high loop'],15:['Fan-rated box','Splices','Blade balance'],1:['Studs 16" on center','Header over opening','Plates nailed off'],2:['Drain connections','Drain slope ¼"/ft'],3:['Breaker sized to wire','Switch wiring','GFCI line/load','Polarity','Grounds bonded','Neutrals unswitched'],4:['Supply air to every room','Return air to every room'],F:['Slab & framing','Seams finished','Floor stagger','Paint coverage','Doors & trim']};
 const TOOLS=[['Hand float','Power trowel',250,'Screeding 2.5× faster'],['Hammer','Framing nail gun',300,'One tap nails a whole stud'],
  ['Hacksaw','PEX crimper kit',350,'Tapped pipes snap to the right fit'],['Basic tester','Stripper + voltage tester',350,'Big snap targets, shows live hot wires'],
  ['Hand snips','Duct crimper',300,'Ducts auto-route clean & straight'],['Normal drill','Drywall screw gun',200,'One tap sinks a whole column'],
@@ -121,7 +125,7 @@ const THEMES=[
 {k:'shed',scale:.86,bd:'outdoor',wall:'sky',sheet:'#d6b47c',groove:1,floor:'grass',dirt:'#6a9a3a',paint:['#9b2226','#2d6a4f','#5c677d','#c9a66b','#f8f9fa'],wallPaint:'#9b2226',door:['#9b2226','#7a1b1e','z'],trimH:10,tile:['#e8e8e8','#dcdcdc'],flr:{c:['#c68b59','#b87a4b','#d19a66'],PL:192,grout:0}},
 {k:'bath',scale:.93,bd:'tile',wall:'#e3eef0',sheet:'#cfe3d4',floor:'tile',dirt:'#8d6e4f',paint:['#a8dadc','#cde6d0','#ffffff','#d6d9dc','#b7c9a8'],wallPaint:'#a8dadc',door:['#fafafa','#e3e3e3','flat'],trimH:16,tile:['#ffffff','#dff1f0'],flr:{c:['#d9dde0','#c9ced3','#e8ebee'],PL:72,grout:1}},
 {k:'house',scale:1,bd:'hall',wall:'#f4ede1',sheet:'#e9e7e2',floor:'wood',dirt:'#8d6e4f',paint:['#d6cfc4','#264653','#f4f1ea','#9caf88','#c8745a'],wallPaint:'#d6cfc4',door:['#a0522d','#8b4513','panel'],trimH:22,tile:['#efe5d4','#e8dcc8'],flr:{c:['#c68b59','#b87a4b','#d19a66'],PL:192,grout:0}}];
-function TH(){return THEMES[SAVE.job||0]}
+function TH(){return THEMES[curJob().th||0]}
 let OFF={x:0,y:0};
 function unoff(fn){ctx.save();ctx.translate(-OFF.x,-OFF.y);fn();ctx.restore()}
 function drawBackdrop(){const T=TH();
@@ -232,7 +236,7 @@ draw(){wallBG();const P15=1.5*PPI;
   ctx.fillStyle='#c9874a';ctx.fillRect(st.hdr.x,st.hdr.y,st.hdr.w,st.hdr.h);ctx.fillStyle='#a86f3a';ctx.fillRect(st.hdr.x,st.hdr.y+st.hdr.h-3,st.hdr.w,3);txt('2x10 HEADER',st.hdr.x+st.hdr.w/2,st.hdr.y+st.hdr.h/2+3,8,'#fff')}
  if(st.ph==='header'){const B=this.hdrBox();ctx.setLineDash([5,5]);ctx.strokeStyle='#e76f51';ctx.lineWidth=2;ctx.strokeRect(B.x,B.y,B.w,B.h);ctx.setLineDash([])}
  for(const n of st.nails){if(n.done){ctx.fillStyle='#555';ctx.beginPath();ctx.arc(n.x,n.y,2.2,0,7);ctx.fill()}else pulse(n.x,n.y,'#e76f51',4.5)}
- if(st.ph==='studs')txt('Studs '+st.studs.length+'/'+this.req.length,WX,FY+38,11,'#2b2d42','left','700')}},
+ if(st.ph==='studs'){txt('Studs '+st.studs.length+'/'+this.req.length,WX,FY+38,11,'#2b2d42','left','700');if(!curJob().lv){ctx.setLineDash([3,4]);ctx.strokeStyle='rgba(231,111,81,.55)';ctx.lineWidth=1.5;for(const r of this.req){const x=Math.min(X(r),WX+WW-4.5)+2.25;ctx.beginPath();ctx.moveTo(x,WY+12);ctx.lineTo(x,FY-6);ctx.stroke()}ctx.setLineDash([]);txt('Guide marks on (easy job)',WX+WW/2,FY+38,10,'#e76f51','center','600')}}}},
 // 3 PLUMBING
 {name:'Plumbing',icon:'🚰',par:45,tip:'Tap pipes to rotate. Connect sink & toilet to the main',
 GX:380,GY:60,T:46,
@@ -255,18 +259,31 @@ draw(){ctx.fillStyle='#f4ede1';ctx.fillRect(0,0,W,H);const{GX,GY,T}=this;ctx.fil
  ctx.fillStyle='#6c757d';ctx.fillRect(SB+10,GY+6*T+6,W-SB-20,18);txt('SEWER MAIN',SB+60,GY+6*T+19,10,'#fff');ctx.fillRect(GX+2.5*T-8,GY+6*T,16,8);
  for(const k in st.tiles){const [r,c]=k.split(',').map(Number),m=st.tiles[k],cx=GX+c*T+T/2,cy=GY+r*T+T/2;const col=st.seen&&st.seen[k]?'#2a9d8f':'#adb5bd';
   ctx.strokeStyle=col;ctx.lineWidth=12;ctx.lineCap='round';for(const [b,dx,dy] of [[1,0,-1],[2,1,0],[4,0,1],[8,-1,0]])if(m&b){ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+dx*T/2,cy+dy*T/2);ctx.stroke()}
-  ctx.fillStyle=col;ctx.beginPath();ctx.arc(cx,cy,8,0,7);ctx.fill()}
- txt('Rotations: '+st.taps,700,90,13,'#2b2d42','left','700');txt('2" PVC DWV',700,110,10,'#666','left','400');
+  ctx.fillStyle=col;ctx.beginPath();ctx.arc(cx,cy,8,0,7);ctx.fill();if(!curJob().lv&&st.ph==='pipes'&&this.sol[k]!==undefined&&m!==this.sol[k]){ctx.strokeStyle='rgba(231,111,81,.8)';ctx.lineWidth=2;ctx.strokeRect(GX+c*T+3,GY+r*T+3,T-6,T-6)}}
+ if(!curJob().lv)txt('Red outline = needs a turn (easy job)',700,130,9.5,'#e76f51','left','600');txt('Rotations: '+st.taps,700,90,13,'#2b2d42','left','700');txt('2" PVC DWV',700,110,10,'#666','left','400');
  if(st.ph==='slope'){rr(660,150,150,80,6,'#fff');txt('Slope per foot',735,176,12,'#2b2d42');txt('for a 2" drain?',735,194,12,'#2b2d42');txt('choose at left ◀',735,214,10,'#888','center','400')}}},
-// 4 ELECTRICAL
+// 4 ELECTRICAL — difficulty ramps by job: 0 = guided outlet + single-pole light, 1 = GFCI + single-pole (hint button), 2 = GFCI + 3-way (tutorial + hint)
 {name:'Electrical',icon:'⚡',par:180,tip:'Drag a wire from the panel to each box & light',
-init(){Object.assign(st,{ph:'run',src:{x:262,y:150},tg:[{x:440,y:280,n:'Outlet',k:'o'},{x:520,y:80,n:'Light',k:'l'},{x:740,y:280,n:'Outlet',k:'o'},{x:700,y:110,n:'Light',k:'l'}],sel:null,done:{},bk:-1,dev:0,
- edges:[],pick:null,s1:0,s2:0,f1:0,f2:0,zap:0})},
-DEV:[{name:'OUTLET',w:[['Black','#222','brass'],['White','#eee','silver'],['Bare','#c47a3a','green']],tl:{brass:'brass',silver:'silver',green:'green'}},
- {name:'LIGHT FIXTURE',w:[['Black','#222','brass'],['White','#eee','silver'],['Green','#2a9d8f','green']],tl:{brass:'house black',silver:'house white',green:'ground screw'}}],
-TM:{brass:{x:590,y:140},silver:{x:410,y:140},green:{x:500,y:300}},
-// --- 3-way puzzle nodes: [x,y,color,label,labelSide] — Box A | Box B | Ceiling box, side by side ---
-N:{L_H:[198,96,'#222','line blk','r'],L_N:[198,122,'#eee','line wht','r'],L_G:[198,148,'#c47a3a','line bare','r'],
+TGS:[[{x:440,y:280,n:'Outlet',k:'o'},{x:380,y:170,n:'Switch',k:'s'},{x:580,y:80,n:'Light',k:'l'}],
+ [{x:440,y:280,n:'GFCI',k:'o'},{x:740,y:280,n:'Outlet',k:'o'},{x:340,y:180,n:'Switch',k:'s'},{x:600,y:80,n:'Light',k:'l'}],
+ [{x:440,y:280,n:'GFCI',k:'o'},{x:520,y:80,n:'Light',k:'l'},{x:740,y:280,n:'Outlet',k:'o'},{x:700,y:110,n:'Light',k:'l'}]],
+init(){const lv=clamp(curJob().elec||0,0,2);Object.assign(st,{lv,ph:'run',src:{x:262,y:150},tg:this.TGS[lv].map(t=>({...t})),sel:null,done:{},bk:-1,dv:0,devs:lv?[2,1]:[0,1],
+ edges:[],pick:null,s1:0,s2:0,f1:0,f2:0,zap:0,hints:0,hintT:0,tut:lv===2&&!SAVE.seen3});if(lv===0)msg('Drag from the PANEL to each blue box. Easy job: hints are on')},
+DEV:[{name:'OUTLET',w:[['Black','#222','brass'],['White','#eee','silver'],['Bare','#c47a3a','green']],TM:{brass:{x:590,y:140,l:'brass (hot)'},silver:{x:410,y:140,l:'silver (neutral)'},green:{x:500,y:300,l:'green (ground)'}}},
+ {name:'LIGHT FIXTURE',w:[['Black','#222','brass'],['White','#eee','silver'],['Green','#2a9d8f','green']],TM:{brass:{x:590,y:140,l:'house black'},silver:{x:410,y:140,l:'house white'},green:{x:500,y:300,l:'ground screw'}}},
+ {name:'GFCI RECEPTACLE (first on the circuit)',w:[['Line blk','#222','lb'],['Line wht','#eee','ls'],['Load blk','#555','db'],['Load wht','#ccc','ds'],['Bare','#c47a3a','green']],
+  TM:{lb:{x:600,y:100,l:'LINE brass'},ls:{x:400,y:100,l:'LINE silver'},db:{x:600,y:230,l:'LOAD brass'},ds:{x:400,y:230,l:'LOAD silver'},green:{x:500,y:310,l:'green'}}}],
+// single-pole circuit: switch box | ceiling box
+SP:{N:{L_H:[198,100,'#222','line blk','r'],L_N:[198,130,'#eee','line wht','r'],L_G:[198,160,'#c47a3a','line bare','r'],
+  S1_G:[328,100,'#2a9d8f','G','l'],S1_A:[392,100,'#d4a017','brass','r'],S1_B:[392,170,'#d4a017','brass','r'],
+  O_B:[476,100,'#222','blk','l'],O_W:[476,130,'#eee','wht','l'],O_G:[476,160,'#c47a3a','bare','l'],
+  C_B:[524,100,'#222','blk','r'],C_W:[524,130,'#eee','wht','r'],C_G:[524,160,'#c47a3a','bare','r'],
+  LT_B:[798,100,'#222','fixture blk','l'],LT_W:[798,130,'#eee','fixture wht','l'],LT_G:[798,160,'#2a9d8f','fixture grn','l']},
+ CABLE:[['O_B','C_B'],['O_W','C_W'],['O_G','C_G']],swK:['S1_A','S1_B'],gK:['S1_G','LT_G','O_G'],
+ sol:[['L_H','S1_A'],['S1_B','O_B'],['L_N','O_W'],['L_G','S1_G'],['S1_G','O_G'],['C_B','LT_B'],['C_W','LT_W'],['C_G','LT_G']],
+ boxes:[[184,310,'SWITCH BOX — single-pole switch','12/2 from panel · 12/2 to light'],[504,310,'CEILING BOX','12/2 from switch · fixture leads']],sws:[[345,0]]},
+// 3-way circuit: Box A | Box B | Ceiling box
+TW:{N:{L_H:[198,96,'#222','line blk','r'],L_N:[198,122,'#eee','line wht','r'],L_G:[198,148,'#c47a3a','line bare','r'],
  S1_C:[268,196,'#333','COM','l'],S1_T1:[316,100,'#d4a017','T','r'],S1_T2:[316,140,'#d4a017','T','r'],S1_G:[268,100,'#2a9d8f','G','l'],
  A3_B:[380,96,'#222','blk','l'],A3_R:[380,122,'#e63946','red','l'],A3_W:[380,148,'#eee','wht','l'],A3_G:[380,174,'#c47a3a','bare','l'],
  B3_B:[414,96,'#222','blk','r'],B3_R:[414,122,'#e63946','red','r'],B3_W:[414,148,'#eee','wht','r'],B3_G:[414,174,'#c47a3a','bare','r'],
@@ -274,56 +291,82 @@ N:{L_H:[198,96,'#222','line blk','r'],L_N:[198,122,'#eee','line wht','r'],L_G:[1
  B2_B:[590,100,'#222','blk','l'],B2_W:[590,128,'#eee','wht','l'],B2_G:[590,156,'#c47a3a','bare','l'],
  LC_B:[626,100,'#222','blk','r'],LC_W:[626,128,'#eee','wht','r'],LC_G:[626,156,'#c47a3a','bare','r'],
  LT_B:[798,100,'#222','fixture blk','l'],LT_W:[798,128,'#eee','fixture wht','l'],LT_G:[798,156,'#2a9d8f','fixture grn','l']},
-CABLE:[['A3_B','B3_B'],['A3_R','B3_R'],['A3_W','B3_W'],['A3_G','B3_G'],['B2_B','LC_B'],['B2_W','LC_W'],['B2_G','LC_G']],
-sim(s1,s2){const P={};const f=a=>P[a]===undefined||P[a]===a?(P[a]=a):(P[a]=f(P[a]));const u=(a,b)=>{P[f(a)]=f(b)};
- for(const [a,b] of st.edges)u(a,b);for(const [a,b] of this.CABLE)u(a,b);u('S1_C',s1?'S1_T2':'S1_T1');u('S2_C',s2?'S2_T2':'S2_T1');
+ CABLE:[['A3_B','B3_B'],['A3_R','B3_R'],['A3_W','B3_W'],['A3_G','B3_G'],['B2_B','LC_B'],['B2_W','LC_W'],['B2_G','LC_G']],three:1,
+ swK:['S1_C','S1_T1','S1_T2','S2_C','S2_T1','S2_T2'],gK:['S1_G','S2_G','LT_G','A3_G','B2_G'],
+ sol:[['L_H','S1_C'],['S1_T1','A3_B'],['S1_T2','A3_R'],['L_N','A3_W'],['L_G','S1_G'],['S1_G','A3_G'],['B3_B','S2_T1'],['B3_R','S2_T2'],['S2_C','B2_B'],['B3_W','B2_W'],['B3_G','S2_G'],['S2_G','B2_G'],['LC_B','LT_B'],['LC_W','LT_W'],['LC_G','LT_G']],
+ boxes:[[184,212,'BOX A — 3-way switch 1','12/2 from panel · 12/3 to Box B'],[402,206,'BOX B — 3-way switch 2','12/3 from A · 12/2 to light'],[614,202,'CEILING BOX','12/2 from Box B · fixture leads']],sws:[[278,0],[498,1]]},
+C(){return st.lv===2?this.TW:this.SP},
+get N(){return this.TW.N},
+sim(s1,s2){const C=this.C(),P={};const f=a=>P[a]===undefined||P[a]===a?(P[a]=a):(P[a]=f(P[a]));const u=(a,b)=>{P[f(a)]=f(b)};
+ for(const [a,b] of st.edges)u(a,b);for(const [a,b] of C.CABLE)u(a,b);if(C.three){u('S1_C',s1?'S1_T2':'S1_T1');u('S2_C',s2?'S2_T2':'S2_T1')}else if(s1)u('S1_A','S1_B');
  const h=f('L_H'),n=f('L_N'),g=f('L_G');return{short:h===n||h===g,on:f('LT_B')===h&&f('LT_W')===n,rev:f('LT_B')===n&&f('LT_W')===h,f,h,n,g}},
-check(){const R=[[0,0],[1,0],[0,1],[1,1]].map(([a,b])=>this.sim(a,b));if(R.some(r=>r.short))return{core:'short'};
- const on=R.map(r=>r.on||r.rev);if(!(on[0]!==on[1]&&on[0]!==on[2]&&on[3]===on[0]))return{core:'Light does not toggle from both switches'};const is=[],r=R[0];
+check(){const C=this.C(),R=(C.three?[[0,0],[1,0],[0,1],[1,1]]:[[0,0],[1,0]]).map(([a,b])=>this.sim(a,b));if(R.some(r=>r.short))return{core:'short'};
+ const on=R.map(r=>r.on||r.rev);if(C.three?!(on[0]!==on[1]&&on[0]!==on[2]&&on[3]===on[0]):on[0]===on[1])return{core:C.three?'Light does not toggle from both switches':'Switch does not control the light'};const is=[],r=R[0];
  if(R.some(r=>r.rev))is.push('Reversed polarity — hot landed on the fixture white');
- const sw=['S1_C','S1_T1','S1_T2','S2_C','S2_T1','S2_T2'];if(R.some(r=>sw.some(k=>r.f(k)===r.n)))is.push('Switched neutral — neutral runs through a switch');
+ if(R.some(r=>C.swK.some(k=>r.f(k)===r.n)))is.push('Switched neutral — neutral runs through a switch');
  if(r.n===r.g)is.push('Neutral bonded to ground in a box');
- const ug=['S1_G','S2_G','LT_G','A3_G','B2_G'].filter(k=>r.f(k)!==r.g);if(ug.length)is.push('Ungrounded: '+ug.join(', ').replace(/_/g,' '));
- if(st.brk)is.push(st.brk);return{core:'ok',is}},
-flip(w){st['s'+w]^=1;st['f'+w]=1;sfx(800,.03);const r=this.sim(st.s1,st.s2);
+ const ug=C.gK.filter(k=>r.f(k)!==r.g);if(ug.length)is.push('Ungrounded: '+ug.join(', ').replace(/_/g,' '));
+ if(st.brk)is.push(st.brk);if(st.gfci)is.push(st.gfci);return{core:'ok',is}},
+flip(w){if(st.tut)return;st['s'+w]^=1;st['f'+w]=1;sfx(800,.03);const r=this.sim(st.s1,st.s2),three=this.C().three;
  if(r.short){st.zap=now();st.miss++;sfx(90,.4);puff(500,200,'#ffb703',20);msg('ZAP! Dead short — breaker tripped');return}
- if(st.f1&&st.f2){const c=this.check();if(c.core==='ok'){msg('Light works from both switches! ✔');setTimeout(()=>{if(mode==='play'&&STAGES[cur]===this)finish(1-st.miss*.06,c.is)},700)}else{msg(c.core);st.miss+=.5}}
- else msg(r.on||r.rev?'Light ON':'Light off — flip the other switch too')},
-BK:['15A','20A','30A'],
-ctrls(){if(st.ph==='term'){const D=this.DEV[st.dev];return D.w.map((w,i)=>({l:w[0]+' wire',sw:w[1],c:st.sel===i?'#ffb703':st.done[i]?'#2a9d8f':'#2b2d42',tc:st.sel===i?'#2b2d42':'#fff',f:()=>{if(!st.done[i])st.sel=i}}))}
- if(st.ph==='brk')return this.BK.map((l,i)=>({l:l+' breaker',f:()=>{st.bk=i;st.brk=i===1?null:(i===0?'15A breaker — bathroom receptacles need a 20A circuit':'30A breaker on 12 AWG wire — fire hazard (max 20A)');st.ph='3way';msg('3-WAY: tap two terminals to connect them')}}));
- if(st.ph==='3way')return[{l:'Switch 1: '+(st.s1?'down':'up'),c:'#4361ee',f:()=>this.flip(1)},{l:'Switch 2: '+(st.s2?'down':'up'),c:'#4361ee',f:()=>this.flip(2)},{l:'Undo',c:'#6c757d',f:()=>{st.edges.pop();st.f1=st.f2=0;msg('Undid last connection')}},{l:'Clear all',c:'#9d0208',f:()=>{st.edges=[];st.f1=st.f2=0;msg('Cleared all connections')}}];return[]},
+ if(st.f1&&(st.f2||!three)){const c=this.check();if(c.core==='ok'){msg(three?'Light works from both switches! ✔':'Switch controls the light! ✔');setTimeout(()=>{if(mode==='play'&&STAGES[cur]===this&&st.ph==='wire')finish(1-st.miss*.06-st.hints*.04,c.is)},700)}else{msg(c.core);st.miss+=.5}}
+ else msg(r.on||r.rev?'Light ON — flip the other switch too':'Light off — flip the other switch too')},
+nextHint(){const C=this.C();return C.sol.find(([a,b])=>!st.edges.some(e=>e.includes(a)&&e.includes(b)))},
+hint(){const h=this.nextHint();if(!h){msg('All the right connections are made — flip the switch'+(this.C().three?'es':''));return}st.hints++;st.hintT=now();msg('Hint: connect '+h[0].replace('_',' ')+' → '+h[1].replace('_',' '))},
+ctrls(){if(st.ph==='term'){const D=this.DEV[st.devs[st.dv]];return D.w.map((w,i)=>({l:w[0],sw:w[1],h:D.w.length>3?32:36,c:st.sel===i?'#ffb703':st.done[i]?'#2a9d8f':'#2b2d42',tc:st.sel===i?'#2b2d42':'#fff',f:()=>{if(!st.done[i])st.sel=i}}))}
+ if(st.ph==='brk')return['15A','20A','30A'].map((l,i)=>({l:l+' breaker',f:()=>{const room=curJob().room||'bathroom';st.bk=i;st.brk=i===1?null:(i===0?'15A breaker — '+room+' receptacles need a 20A circuit':'30A breaker on 12 AWG wire — fire hazard (max 20A)');st.ph='wire';
+   msg(st.lv===2?'3-WAY: tap two terminals to connect them':st.lv===0?'Wire the switch: follow the pulsing yellow terminals':'Wire the switch & light: tap two terminals to connect')}}));
+ if(st.ph==='wire'){if(st.tut)return[{l:'Got it',c:'#2a9d8f',f:()=>{st.tut=false;SAVE.seen3=1;save()}}];const h=30,three=this.C().three;
+  const c=[{l:'Switch 1: '+(st.s1?(three?'down':'ON'):(three?'up':'OFF')),c:'#4361ee',h,f:()=>this.flip(1)}];if(three)c.push({l:'Switch 2: '+(st.s2?'down':'up'),c:'#4361ee',h,f:()=>this.flip(2)});
+  if(st.lv>0)c.push({l:'💡 Hint (-4%)',c:'#b5838d',h,f:()=>this.hint()});if(three)c.push({l:'📖 3-way guide',c:'#6d597a',h,f:()=>{st.tut=true}});
+  c.push({l:'Undo',c:'#6c757d',h,f:()=>{st.edges.pop();st.f1=st.f2=0;msg('Undid last connection')}},{l:'Clear all',c:'#9d0208',h,f:()=>{st.edges=[];st.f1=st.f2=0;msg('Cleared all connections')}});return c}return[]},
 down(p){if(st.ph==='run')runDown(p,st.src);
- else if(st.ph==='term'){const D=this.DEV[st.dev];if(st.sel===null){msg('Pick a wire on the left first');return}for(const k in this.TM)if(dist(p,this.TM[k])<30){if(D.w[st.sel][2]===k){st.done[st.sel]=1;sfx(500);st.sel=null;msg('Good connection!');
-    if(Object.keys(st.done).length===3){if(st.dev===0){st.dev=1;st.done={};msg('Now the light fixture: lead → house wire')}else{st.ph='brk';msg('12 AWG wire on a bath circuit. Pick the breaker:')}}}
-   else{st.miss++;sfx(120,.3);puff(p.x,p.y,'#ffb703',12);msg('Zap! Wrong terminal')}return}}
- else if(st.ph==='3way'){for(const k in this.N){const [x,y]=this.N[k];if(Math.hypot(p.x-x,p.y-y)<12){if(!st.pick){st.pick=k;msg('Connect '+k.replace('_',' ')+' to…')}else if(st.pick===k)st.pick=null;else{
-    if(!st.edges.some(e=>e.includes(k)&&e.includes(st.pick)))st.edges.push([st.pick,k]);st.pick=null;st.f1=st.f2=0;sfx(450);msg(st.edges.length+' connections — flip both switches to test')}return}}st.pick=null}},
+ else if(st.ph==='term'){const D=this.DEV[st.devs[st.dv]];if(st.sel===null){msg('Pick a wire on the left first');return}for(const k in D.TM)if(dist(p,D.TM[k])<28){const want=D.w[st.sel][2];if(want===k){st.done[st.sel]=1;sfx(500);st.sel=null;msg('Good connection!');
+    if(Object.keys(st.done).length===D.w.length){st.dv++;st.done={};if(st.dv<st.devs.length){const n=this.DEV[st.devs[st.dv]].name;msg('Now the '+n.toLowerCase()+(st.lv===0?': black → brass, white → silver, green/bare → ground':''))}else{st.ph='brk';msg('12 AWG wire. Pick the breaker'+(st.lv===0?' (hint: 12 AWG is rated for 20A)':':'))}}}
+   else if(st.devs[st.dv]===2&&((want==='lb'&&k==='db')||(want==='ls'&&k==='ds')||(want==='db'&&k==='lb')||(want==='ds'&&k==='ls'))){st.miss++;sfx(140,.2);msg('Line/Load swapped — the panel feed goes on LINE or the GFCI won\'t protect downstream')}
+   else{st.miss++;sfx(120,.3);puff(p.x,p.y,'#ffb703',12);msg('Zap! Wrong terminal'+(st.lv===0?' — black goes to brass, white to silver':''))}return}}
+ else if(st.ph==='wire'){if(st.tut)return;const N=this.C().N;for(const k in N){const [x,y]=N[k];if(Math.hypot(p.x-x,p.y-y)<12){if(!st.pick){st.pick=k;msg('Connect '+k.replace('_',' ')+' to…')}else if(st.pick===k)st.pick=null;else{
+    if(!st.edges.some(e=>e.includes(k)&&e.includes(st.pick)))st.edges.push([st.pick,k]);st.pick=null;st.f1=st.f2=0;sfx(450);msg(st.edges.length+' connections — flip the switch'+(this.C().three?'es':'')+' to test')}return}}st.pick=null}},
 move(p){if(st.ph==='run')runMove(p)},
-up(){if(st.ph==='run'&&runUp(st.tg)&&st.tg.every(t=>t.done)){st.ph='term';msg('Outlet: pick a wire, then tap its terminal')}},
+up(){if(st.ph==='run'&&runUp(st.tg)&&st.tg.every(t=>t.done)){st.ph='term';msg(this.DEV[st.devs[0]].name.split(' (')[0]+': pick a wire, then tap its terminal')}},
 draw(){wallBG();studs();rr(st.src.x-28,st.src.y-45,56,90,4,'#6c757d');for(let i=0;i<6;i++)rr(st.src.x-19,st.src.y-38+i*13,38,9,2,'#343a40');txt('PANEL',st.src.x,st.src.y+60,11,'#333');
- if(st.ph==='run'){for(const t of st.tg){strokePath(t.path,'#f4d35e',5);if(t.k==='o'){rr(t.x-14,t.y-18,28,36,4,'#4895ef')}else{ctx.fillStyle='#4895ef';ctx.beginPath();ctx.arc(t.x,t.y,17,0,7);ctx.fill();txt('💡',t.x,t.y+6,14)}txt(t.n,t.x,t.y+32,10,'#333')}strokePath(st.path,'#f4d35e',5);
+ if(st.ph==='run'){for(const t of st.tg){strokePath(t.path,'#f4d35e',5);if(t.k==='o'){rr(t.x-14,t.y-18,28,36,4,'#4895ef')}else if(t.k==='s'){rr(t.x-12,t.y-18,24,36,4,'#4895ef');rr(t.x-4,t.y-8,8,14,2,'#fff')}else{ctx.fillStyle='#4895ef';ctx.beginPath();ctx.arc(t.x,t.y,17,0,7);ctx.fill();txt('💡',t.x,t.y+6,14)}txt(t.n,t.x,t.y+32,10,'#333')}strokePath(st.path,'#f4d35e',5);
   for(const t of st.tg)if(!t.done)pulse(t.x,t.y,'rgba(231,111,81,.6)',4);return}
  ctx.fillStyle='#2b2d42';ctx.fillRect(0,0,W,H);
- if(st.ph==='3way')return this.draw3();
- const D=this.DEV[st.dev],T=this.TM;txt(D.name,500,30,15,'#ffb703','center','800');
- if(st.dev===0){rr(440,60,120,220,16,'#fdfdfd');for(const y of [115,225]){rr(478,y-30,44,60,20,'#f1f1f1');ctx.fillStyle='#333';ctx.fillRect(488,y-14,5,18);ctx.fillRect(507,y-14,5,22)}}
+ if(st.ph==='wire')return this.drawWire();
+ const di=st.devs[Math.min(st.dv,st.devs.length-1)],D=this.DEV[di],T=D.TM;txt(D.name,500,30,14,'#ffb703','center','800');
+ if(di===0){rr(440,60,120,220,16,'#fdfdfd');for(const y of [115,225]){rr(478,y-30,44,60,20,'#f1f1f1');ctx.fillStyle='#333';ctx.fillRect(488,y-14,5,18);ctx.fillRect(507,y-14,5,22)}}
+ else if(di===2){rr(440,50,120,250,16,'#fdfdfd');for(const y of [95,255]){rr(478,y-26,44,52,18,'#f1f1f1');ctx.fillStyle='#333';ctx.fillRect(488,y-12,5,16);ctx.fillRect(507,y-12,5,20)}rr(470,150,60,20,4,'#e63946');txt('TEST',500,164,9,'#fff');rr(470,176,60,20,4,'#adb5bd');txt('RESET',500,190,9,'#2b2d42');
+  txt('LINE ▲',500,128,9,'#2a9d8f','center','800');txt('LOAD ▼',500,216,9,'#888','center','800')}
  else{ctx.fillStyle='#ffe8a3';ctx.beginPath();ctx.arc(500,190,80,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(500,190,52,0,7);ctx.fill();txt('💡',500,202,34)}
- pulse(T.brass.x,T.brass.y,st.dev?'#222':'#d4a017',10);pulse(T.silver.x,T.silver.y,st.dev?'#eee':'#c0c0c0',10);pulse(T.green.x,T.green.y,'#2a9d8f',10);
- txt(D.tl.brass,T.brass.x+18,T.brass.y+4,11,'#fff','left');txt(D.tl.silver,T.silver.x-18,T.silver.y+4,11,'#fff','right');txt(D.tl.green,T.green.x+18,T.green.y+4,11,'#fff','left');
- D.w.forEach((w,i)=>{if(st.done[i])strokePath([{x:SB+4,y:CY0+i*CSTEP+18},{x:T[w[2]].x,y:T[w[2]].y}],w[1],5)});
- if(st.sel!==null){const w=D.w[st.sel];strokePath([{x:SB+4,y:CY0+st.sel*CSTEP+18},{x:SB+40,y:CY0+st.sel*CSTEP+18}],w[1],5)}
- if(st.ph==='brk'){rr(640,300,170,60,6,'#fff');txt('Bathroom outlets',725,324,12,'#2b2d42');txt('12 AWG copper',725,344,12,'#2b2d42','center','400')}},
-draw3(){const N=this.N;const box=(x,w,t1,t2)=>{rr(x,44,w,256,4,'#3d405b');txt(t1,x+w/2,60,10,'#ffb703','center','700');txt(t2,x+w/2,290,8.5,'#cfd3e6','center','400')};
- box(184,212,'BOX A — 3-way switch 1','12/2 from panel · 12/3 to Box B');box(402,206,'BOX B — 3-way switch 2','12/3 from A · 12/2 to light');box(614,202,'CEILING BOX','12/2 from Box B · fixture leads');
- for(const [x,s] of [[278,st.s1],[498,st.s2]]){rr(x,92,30,114,5,'#f8f9fa');rr(x+5,112+(s?44:0),20,30,4,'#adb5bd');}
+ const want=st.sel!==null&&st.ph==='term'?D.w[st.sel][2]:null;
+ for(const k in T){const t=T[k];pulse(t.x,t.y,k==='green'?'#2a9d8f':/s$|silver/.test(k)?'#c0c0c0':'#d4a017',10);if(st.lv===0&&want===k){ctx.strokeStyle='#7CFC00';ctx.lineWidth=3;ctx.beginPath();ctx.arc(t.x,t.y,17,0,7);ctx.stroke()}
+  txt(t.l,t.x>500?t.x+18:t.x<500?t.x-18:t.x+18,t.y+4,11,'#fff',t.x<500?'right':'left')}
+ if(st.ph==='term'){const L=ctrlList();D.w.forEach((w,i)=>{if(st.done[i]&&L[i])strokePath([{x:SB+4,y:L[i].y+L[i].h/2},{x:T[w[2]].x,y:T[w[2]].y}],w[1],5)});
+  if(st.sel!==null&&L[st.sel])strokePath([{x:SB+4,y:L[st.sel].y+L[st.sel].h/2},{x:SB+40,y:L[st.sel].y+L[st.sel].h/2}],D.w[st.sel][1],5)}
+ if(st.ph==='brk'){rr(640,300,170,60,6,'#fff');txt((curJob().room||'bathroom')+' outlets',725,324,12,'#2b2d42');txt('12 AWG copper',725,344,12,'#2b2d42','center','400')}},
+drawWire(){const C=this.C(),N=C.N;for(const [x,w,t1,t2] of C.boxes){rr(x,44,w,256,4,'#3d405b');txt(t1,x+w/2,60,10,'#ffb703','center','700');txt(t2,x+w/2,290,8.5,'#cfd3e6','center','400')}
+ for(const [x,i] of C.sws){const s=i?st.s2:st.s1;rr(x,92,30,90,5,'#f8f9fa');rr(x+5,104+(C.three?(s?40:0):(s?0:40)),20,30,4,'#adb5bd')}
  const r=this.sim(st.s1,st.s2),on=!r.short&&(r.on||r.rev);ctx.fillStyle=on?'#ffe066':'#6c757d';ctx.beginPath();ctx.arc(716,232,28,0,7);ctx.fill();if(on){ctx.fillStyle='rgba(255,224,102,.25)';ctx.beginPath();ctx.arc(716,232,46,0,7);ctx.fill()}txt('💡',716,240,22);
- ctx.setLineDash([2,4]);ctx.strokeStyle='#888';ctx.lineWidth=1;for(const [a,b] of this.CABLE){ctx.beginPath();ctx.moveTo(N[a][0]+8,N[a][1]);ctx.lineTo(N[b][0]-8,N[b][1]);ctx.stroke()}for(const k of ['L_H','L_N','L_G']){ctx.beginPath();ctx.moveTo(SB,N[k][1]);ctx.lineTo(N[k][0]-8,N[k][1]);ctx.stroke()}ctx.setLineDash([]);
- for(const [a,b] of st.edges){const c=N[a][2]==='#333'||N[a][2]==='#d4a017'||N[a][2]==='#2a9d8f'?N[b][2]:N[a][2];strokePath([{x:N[a][0],y:N[a][1]},{x:N[b][0],y:N[b][1]}],'#111',6);strokePath([{x:N[a][0],y:N[a][1]},{x:N[b][0],y:N[b][1]}],c,3)}
+ ctx.setLineDash([2,4]);ctx.strokeStyle='#888';ctx.lineWidth=1;for(const [a,b] of C.CABLE){ctx.beginPath();ctx.moveTo(N[a][0]+8,N[a][1]);ctx.lineTo(N[b][0]-8,N[b][1]);ctx.stroke()}for(const k of ['L_H','L_N','L_G']){ctx.beginPath();ctx.moveTo(SB,N[k][1]);ctx.lineTo(N[k][0]-8,N[k][1]);ctx.stroke()}ctx.setLineDash([]);
+ for(const [a,b] of st.edges){const c=['#333','#d4a017','#2a9d8f'].includes(N[a][2])?N[b][2]:N[a][2];strokePath([{x:N[a][0],y:N[a][1]},{x:N[b][0],y:N[b][1]}],'#111',6);strokePath([{x:N[a][0],y:N[a][1]},{x:N[b][0],y:N[b][1]}],c,3)}
+ const hn=(st.lv===0||now()-st.hintT<4)&&!st.tut?this.nextHint():null;
  for(const k in N){const [x,y,c,l,sd]=N[k];ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y,7.5,0,7);ctx.fill();ctx.strokeStyle=st.pick===k?'#ffb703':'#000';ctx.lineWidth=st.pick===k?3:1;ctx.stroke();if(st.tool&&!r.short&&r.f(k)===r.h){ctx.strokeStyle='#ff3b30';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,11,0,7);ctx.stroke()}
+  if(hn&&hn.includes(k)){const q=.5+.5*Math.sin(now()*6);ctx.strokeStyle='rgba(255,230,0,'+(.5+q*.5)+')';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,13+q*3,0,7);ctx.stroke()}
   txt(l,sd==='r'?x+11:x-11,y+3.5,8.5,'#fff',sd==='r'?'left':'right','500')}
+ if(hn){const [a,b]=hn;ctx.setLineDash([4,4]);strokePath([{x:N[a][0],y:N[a][1]},{x:N[b][0],y:N[b][1]}],'rgba(255,230,0,.6)',2);ctx.setLineDash([])}
  if(now()-st.zap<.4){ctx.fillStyle='rgba(255,183,3,.5)';ctx.fillRect(0,0,W,H)}
- txt('COM = dark screw · T = brass traveler screws · flip BOTH switches to test',SB+14,326,10,'#cfd3e6','left','400');txt('Connections: '+st.edges.length,SB+14,346,11,'#ffb703','left','700')}},
+ txt(C.three?'COM = dark screw · T = brass traveler screws · flip BOTH switches to test':st.lv===0?'Hot (black) goes THROUGH the switch · white goes straight to the light · bare/green to every ground':'Switch the HOT, never the neutral · ground every box & device',SB+14,326,10,'#cfd3e6','left','400');txt('Connections: '+st.edges.length+'/'+C.sol.length,SB+14,346,11,'#ffb703','left','700');
+ if(st.tut)this.drawTut()},
+drawTut(){ctx.fillStyle='rgba(20,22,30,.94)';ctx.fillRect(SB,0,W-SB,H);txt('HOW A 3-WAY SWITCH WORKS',500,34,16,'#ffb703','center','800');
+ const A={x:330,y:150},B={x:620,y:150};
+ strokePath([{x:200,y:150},{x:A.x-30,y:150}],'#222',5);txt('HOT in',205,140,10,'#fff','left');
+ for(const [P,n] of [[A,'SWITCH 1'],[B,'SWITCH 2']]){rr(P.x-30,P.y-50,60,100,6,'#f8f9fa');txt(n,P.x,P.y+68,11,'#fff');ctx.fillStyle='#333';ctx.beginPath();ctx.arc(P.x-18,P.y,6,0,7);ctx.fill();txt('COM',P.x-18,P.y+22,8,'#333')}
+ strokePath([{x:A.x+18,y:A.y-30},{x:B.x-18,y:B.y-30}],'#222',4);strokePath([{x:A.x+18,y:A.y+30},{x:B.x-18,y:B.y+30}],'#e63946',4);
+ txt('traveler 1 (black)',475,A.y-38,10,'#fff');txt('traveler 2 (red)',475,A.y+48,10,'#e63946');
+ const sw=Math.floor(now()/1.5)%4,s1=sw&1,s2=(sw>>1)&1;for(const [P,s,L] of [[A,s1,1],[B,s2,-1]]){strokePath([{x:P.x-18*L,y:P.y},{x:P.x+18*L,y:P.y+(s?30:-30)}],'#ffb703',3)}
+ const lit=s1===s2;strokePath([{x:B.x+30,y:150},{x:740,y:150}],'#222',5);ctx.fillStyle=lit?'#ffe066':'#6c757d';ctx.beginPath();ctx.arc(760,150,20,0,7);ctx.fill();txt('LIGHT '+(lit?'ON':'OFF'),760,190,10,'#fff');
+ wrap('• Hot (black from panel) lands on COM of switch 1. • The two travelers (black + red in the 12/3) connect the brass T screws of both switches. • COM of switch 2 sends hot on to the light. • White neutral is spliced straight through — never on a switch. • Ground every switch, box and the fixture.',200,250,590,11.5,'#e4e6f0',16,'left',8)}},
 // 5 HVAC
 {name:'HVAC',icon:'🌀',par:60,tip:'Pick SUPPLY or RETURN, then drag a duct from the furnace into a room',
 ROOMS:[{n:'Bedroom 1',x:190,y:40,w:190,h:120},{n:'Bath',x:390,y:40,w:170,h:120},{n:'Bedroom 2',x:570,y:40,w:206,h:120},{n:'Kitchen',x:190,y:220,w:280,h:110},{n:'Living',x:480,y:220,w:296,h:110}],
@@ -404,7 +447,7 @@ down(p){if(st.ph==='cut'){this.move(p);return}
 move(p){if(st.ph==='cut'&&p.y>260){st.ang=Math.round(clamp((p.x-this.DX)/this.DW*50,0,50)*2)/2;if(st.tool)for(const a of [0,22.5,45])if(Math.abs(st.ang-a)<4)st.ang=a}},
 draw(){if(st.ph==='nail'){wallBG();drywallWall(false);const th=TH().trimH;ctx.fillStyle=TH().wallPaint;ctx.fillRect(WX,WY,WW,WH);{const g=ctx.createLinearGradient(0,FY-th,0,FY);g.addColorStop(0,'#fbfaf7');g.addColorStop(.25,'#e9e7e1');g.addColorStop(1,'#d4d1c9');ctx.fillStyle=g;ctx.fillRect(WX,FY-th,WW,th);ctx.fillStyle='rgba(255,255,255,.9)';ctx.fillRect(WX,FY-th,WW,1)}ctx.fillStyle='#ddd';ctx.fillRect(WX,FY-th,WW,3);if(th>20)ctx.fillRect(WX,FY-th+8,WW,2);
   for(const n of st.nails){if(n.done){ctx.fillStyle='#999';ctx.beginPath();ctx.arc(n.x,n.y,2,0,7);ctx.fill()}else pulse(n.x,n.y)}return}
- ctx.fillStyle='#e9dcc9';ctx.fillRect(0,0,W,H);const c=this.cuts[st.ci];txt(c.n,500,40,16,'#2b2d42','center','800');txt('Cut '+(st.ci+1)+' of 3',500,60,12,'#666');
+ ctx.fillStyle='#e9dcc9';ctx.fillRect(0,0,W,H);const c=this.cuts[st.ci];txt(c.n,500,40,16,'#2b2d42','center','800');txt('Cut '+(st.ci+1)+' of 3'+(curJob().lv?'':' · hint: miter = corner angle ÷ 2'),500,60,12,'#666');
  ctx.fillStyle='#8d6e63';ctx.fillRect(250,200,500,12);
  ctx.save();ctx.translate(500,170);ctx.fillStyle='#fffaf0';ctx.fillRect(-230,-26,460,52);ctx.strokeStyle='#d4c4a8';ctx.strokeRect(-230,-26,460,52);ctx.rotate(st.ang*Math.PI/180);ctx.fillStyle='rgba(230,57,70,.85)';ctx.fillRect(-2,-95,4,190);ctx.restore();
  ctx.fillStyle='#6c757d';ctx.beginPath();ctx.arc(500,170,8,0,7);ctx.fill();
@@ -419,7 +462,7 @@ OPT:[0,2/3,1/3],
 lay(i){const o=this.OPT[i];const prev=st.rows[st.rows.length-1];
  if(prev!==undefined&&Math.abs(prev-o)<.01){st.hj++;msg('H-joint! Seams line up with last row');sfx(150,.2)}else{msg('Row '+(st.rows.length+1)+' down');sfx(380)}
  st.rows.push(o);if(st.rows.length===7)finish(1-st.hj*.15-st.miss*.05,st.hj?[st.hj+' H-joint(s) — floor seams line up row to row']:[])},
-ctrls(){if(st.ph!=='lay')return[];const pk=st.tool&&st.rows.length?this.OPT.indexOf(st.rows[st.rows.length-1]):-1;return['Full','2/3','1/3'].map((l,i)=>({l:(i===pk?'✘ ':'')+l+' starter',c:i===pk?'#9d0208':'#2b2d42',f:()=>this.lay(i)}))},
+ctrls(){if(st.ph!=='lay')return[];const pk=(st.tool||!curJob().lv)&&st.rows.length?this.OPT.indexOf(st.rows[st.rows.length-1]):-1;return['Full','2/3','1/3'].map((l,i)=>({l:(i===pk?'✘ ':'')+l+' starter',c:i===pk?'#9d0208':'#2b2d42',f:()=>this.lay(i)}))},
 down(p){if(st.ph==='gap'){for(const s of st.sp)if(!s.done&&dist(p,s)<18){s.done=true;sfx(300);if(st.sp.every(s=>s.done)){st.ph='lay';msg('Pick the starter cut for each row — stagger the seams!')}return}st.miss++}},
 draw(){const F=this.F;ctx.fillStyle='#ece4d8';ctx.fillRect(0,0,W,H);ctx.fillStyle='#d6cbb8';ctx.fillRect(F.x,F.y,F.w,F.h);ctx.fillStyle='#8d99ae';ctx.fillRect(F.x-8,F.y-8,F.w+16,8);ctx.fillRect(F.x-8,F.y,8,F.h);ctx.fillRect(F.x+F.w,F.y,8,F.h);ctx.fillRect(F.x-8,F.y+F.h,F.w+16,6);
  const FT=TH().flr,PL=FT.PL,RH=41,gx=8;if(FT.grout){ctx.fillStyle='#9aa5ad';ctx.fillRect(F.x,F.y,F.w,F.h)}
@@ -559,7 +602,7 @@ function ctrlList(){const S=STAGES[cur];const L=(S&&S.ctrls)?S.ctrls():[];let y=
 const BACKP={x:8,y:8,w:62,h:24};
 function hud(){const g=ctx.createLinearGradient(0,0,SB,0);g.addColorStop(0,'#24282d');g.addColorStop(1,'#2b2d42');ctx.fillStyle=g;ctx.fillRect(0,0,SB,H);ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(SB-2,0,2,H);
  rr(BACKP.x,BACKP.y,BACKP.w,BACKP.h,4,'#444');txt('◀ Map',BACKP.x+BACKP.w/2,BACKP.y+16,10,'#fff');txt('⏱ '+(now()-t0).toFixed(0)+'s',SB-10,24,12,'#fff','right','400');
- ctx.letterSpacing='1.5px';txt('DIEMER RENOVATIONS',10,50,8.5,'#ffb703','left');ctx.letterSpacing='0px';
+ ctx.letterSpacing='1.5px';txt(COMPANY,10,50,8.5,'#ffb703','left');ctx.letterSpacing='0px';
  txt(curJob().icon+' '+STAGES[cur].name.toUpperCase(),10,72,15,'#fff','left','700');
  const T=TOOLS[cur];txt('🔧 '+(st.tool?T[1]:T[0]),10,90,9.5,st.tool?'#ffb703':'#8d93ab','left',st.tool?'800':'400');
  ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(10,98,SB-20,1);wrap(MSG,10,114,SB-20,11.5,'#e4e6f0',14,'left',4);
@@ -567,19 +610,20 @@ function hud(){const g=ctx.createLinearGradient(0,0,SB,0);g.addColorStop(0,'#242
 // ---------- screens ----------
 const START={x:W/2-100,y:300,w:200,h:50};
 function nextIdx(){for(const i of curJob().stages)if(!SAVE.results[i])return i;return -1}
-function hdr(t1,t2){rr(0,0,W,52,0,'#2b2d42');ctx.letterSpacing='2px';txt('DIEMER RENOVATIONS',W/2,16,9,'#ffb703');ctx.letterSpacing='0px';txt(t1,W/2,36,17);txt(t2,W/2,49,10,'#cfd3e6','center','400')}
+function hdr(t1,t2){rr(0,0,W,52,0,'#2b2d42');ctx.letterSpacing='2px';txt(COMPANY,W/2,16,9,'#ffb703');ctx.letterSpacing='0px';txt(t1,W/2,36,17);txt(t2,W/2,49,10,'#cfd3e6','center','400')}
 function smallBtn(b,l,c='#444'){rr(b.x,b.y,b.w,b.h,6,c);txt(l,b.x+b.w/2,b.y+b.h/2+4,10,'#fff')}
 const BACK={x:10,y:12,w:70,h:28},SHOPB={x:W-90,y:12,w:80,h:28},ADSB={x:W-150,y:12,w:140,h:28},CAREER_SHOP={x:W/2-110,y:340,w:220,h:44};
 function drawTitle(){ctx.fillStyle='#ffb703';ctx.fillRect(0,0,W,H);for(let i=-10;i<30;i++){ctx.fillStyle='#2b2d42';ctx.beginPath();ctx.moveTo(i*40,370);ctx.lineTo(i*40+20,370);ctx.lineTo(i*40+50,400);ctx.lineTo(i*40+30,400);ctx.fill();ctx.beginPath();ctx.moveTo(i*40,0);ctx.lineTo(i*40+20,0);ctx.lineTo(i*40+50,30);ctx.lineTo(i*40+30,30);ctx.fill()}
  txt('🔨',W/2,110,56);txt('BUILT TO CODE',W/2,170,38,'#2b2d42','center','900');txt('Construction Sim',W/2,200,18,'#2b2d42');
- txt('Career mode: shed → bath → house',W/2,240,14,'#2b2d42','center','400');txt('Bank: $'+SAVE.money+'  ·  Jobs done: '+SAVE.jobs,W/2,264,14,'#2b2d42','center','600');
+ txt('Career: shed → bath → kitchen → basement → house',W/2,240,14,'#2b2d42','center','400');txt('Bank: $'+SAVE.money+'  ·  Jobs done: '+SAVE.jobs,W/2,264,14,'#2b2d42','center','600');
  button(START,'START',"#2b2d42",'#ffb703',22)}
-function cardR(i){const cw=244;return{x:22+i*(cw+14),y:66,w:cw,h:258}}
+function cardR(i){const cw=148;return{x:22+i*(cw+8),y:62,w:cw,h:268}}
 function drawCareer(){ctx.fillStyle='#f4ede1';ctx.fillRect(0,0,W,H);hdr('CAREER','Bank $'+SAVE.money+' · '+SAVE.jobs+' jobs done');
  JOBS.forEach((J,i)=>{const R=cardR(i),lock=i>SAVE.unlocked,act=SAVE.job===i&&SAVE.results.some(r=>r);rr(R.x,R.y,R.w,R.h,8,lock?'#e2dccf':'#fff');
-  txt(J.icon,R.x+R.w/2,R.y+56,40,'#000');txt(J.n,R.x+R.w/2,R.y+90,17,lock?'#999':'#2b2d42','center','800');wrap(J.d,R.x+R.w/2,R.y+112,R.w-30,11,'#666',14,'center',3);
-  txt(J.stages.length+' trades · pay ×'+J.mult,R.x+R.w/2,R.y+168,12,'#2a9d8f','center','700');txt('Completed: '+(SAVE.done[i]||0),R.x+R.w/2,R.y+186,11,'#888','center','400');
-  if(lock)txt('🔒 Finish '+JOBS[i-1].n,R.x+R.w/2,R.y+226,11,'#999','center','600');else button({x:R.x+40,y:R.y+204,w:R.w-80,h:36},act?'CONTINUE':'TAKE JOB',act?'#ffb703':'#2b2d42',act?'#2b2d42':'#fff',12)});
+  txt(J.icon,R.x+R.w/2,R.y+44,30,'#000');txt(J.n,R.x+R.w/2,R.y+76,13.5,lock?'#999':'#2b2d42','center','800');wrap(J.d,R.x+R.w/2,R.y+96,R.w-16,10,'#666',13,'center',2);
+  txt(J.stages.length+' trades · ×'+J.mult,R.x+R.w/2,R.y+134,11,'#2a9d8f','center','700');txt('Difficulty '+'●'.repeat(i+1)+'○'.repeat(JOBS.length-1-i),R.x+R.w/2,R.y+152,10,'#e09f3e','center','700');
+  wrap(J.elecLabel,R.x+R.w/2,R.y+172,R.w-16,9.5,'#4361ee',12,'center',2);txt('Completed: '+(SAVE.done[i]||0),R.x+R.w/2,R.y+208,10,'#888','center','400');
+  if(lock)wrap('🔒 Finish '+JOBS[i-1].n,R.x+R.w/2,R.y+238,R.w-16,10,'#999',12,'center',2);else button({x:R.x+14,y:R.y+222,w:R.w-28,h:34},act?'CONTINUE':'TAKE JOB',act?'#ffb703':'#2b2d42',act?'#2b2d42':'#fff',12)});
  button(CAREER_SHOP,'🛠  TOOL SHOP','#2a9d8f','#fff',16)}
 function shopRow(i){const c=i<8?0:1,r=i%8;return{x:12+c*402,y:58+r*40,w:394,h:36}}
 function drawShop(){ctx.fillStyle='#f4ede1';ctx.fillRect(0,0,W,H);hdr('TOOL SHOP','Bank $'+SAVE.money);smallBtn(BACK,'◀ Back');
