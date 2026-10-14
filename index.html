@@ -237,14 +237,15 @@ down(p){const R=this.R;if(st.ph==='forms'){const s=this.sideRects();for(let i=0;
  else if(st.ph==='pour'&&inR(p,R.x,R.y,R.w,R.h))st.pouring=true;else if(st.ph==='screed')this.move(p,p)},
 move(p,l){if(st.ph!=='screed')return;const R=this.R;if(!inR(p,R.x,R.y,R.w,R.h))return;const i=clamp(Math.floor((p.y-R.y)/R.h*10),0,9);
  st.rows[i]=Math.min(1,st.rows[i]+Math.abs(p.x-l.x)/R.w*(st.tool>1?5.5:st.tool?3.5:1.4));if(Math.random()<.2)puff(p.x,p.y,'#999');
- if(st.rows.every(v=>v>=1))finish(st.pq-st.miss*.03,st.fill>1.08?['Slab overpoured — uneven edges']:[])},
+ if(st.rows.every(v=>v>=.95))finish(st.pq-st.miss*.03,st.fill>1.08?['Slab overpoured — uneven edges']:[])},
 up(){if(st.ph==='pour'&&st.pouring){st.pouring=false;this.endPour()}},
 draw(){const R=this.R;ctx.fillStyle=TH().dirt;ctx.fillRect(0,0,W,H);ctx.fillStyle='rgba(0,0,0,.12)';for(let i=0;i<90;i++)ctx.fillRect((i*97)%W,(i*53)%H,4,3);
  ctx.fillStyle='#a8a29a';ctx.fillRect(R.x,R.y,R.w,R.h);ctx.strokeStyle='#888';ctx.lineWidth=1;for(let x=R.x;x<=R.x+R.w;x+=30){ctx.beginPath();ctx.moveTo(x,R.y);ctx.lineTo(x,R.y+R.h);ctx.stroke()}for(let y=R.y;y<=R.y+R.h;y+=30){ctx.beginPath();ctx.moveTo(R.x,y);ctx.lineTo(R.x+R.w,y);ctx.stroke()}
  txt('10 ft × 8 ft slab · rebar grid',R.x+R.w/2,R.y-22,10,'#fff','center','400');
  this.sideRects().forEach((r,i)=>{if(st.sides[i]){ctx.fillStyle='#d9a066';ctx.fillRect(...r)}else{ctx.setLineDash([6,5]);ctx.strokeStyle='#ffb703';ctx.lineWidth=2;ctx.strokeRect(...r);ctx.setLineDash([])}});
  if(st.ph!=='forms'){const f=Math.min(1,st.fill);ctx.fillStyle='#b9b5ae';ctx.fillRect(R.x,R.y+R.h*(1-f),R.w,R.h*f);
-  if(st.ph==='screed')for(let i=0;i<10;i++){const y=R.y+i*R.h/10;ctx.fillStyle=`rgba(120,115,108,${1-st.rows[i]})`;for(let k=0;k<9;k++)ctx.fillRect(R.x+((k*37+i*19)%R.w),y+((k*7)%18),18,6);if(st.rows[i]>=1){ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(R.x,y,R.w,R.h/10)}}
+  if(st.ph==='screed')for(let i=0;i<10;i++){const y=R.y+i*R.h/10;ctx.fillStyle=`rgba(120,115,108,${1-st.rows[i]})`;for(let k=0;k<9;k++)ctx.fillRect(R.x+((k*37+i*19)%R.w),y+((k*7)%18),18,6);if(st.rows[i]>=.95){ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(R.x,y,R.w,R.h/10)}else{ctx.fillStyle='rgba(231,111,81,'+(.5+.4*Math.sin(now()*6))+')';ctx.fillRect(R.x-8,y+2,5,R.h/10-4)}}
+  if(st.ph==='screed'){const pc=Math.floor(st.rows.reduce((t,v)=>t+Math.min(1,v/.95),0)/st.rows.length*100);rr(R.x,R.y+R.h+8,150,22,4,'rgba(43,45,66,.85)');txt('Screed '+pc+'%',R.x+10,R.y+R.h+23,11,'#fff','left','700')}
   if(st.pouring){ctx.fillStyle='#9a958d';ctx.fillRect(last.x-8,0,16,last.y);ctx.fillStyle='#e76f51';ctx.fillRect(last.x-30,0,60,30)}}
  if(st.ph==='pour'){const gx=700,gy=60,gh=240;rr(gx,gy,24,gh,4,'#fff');ctx.fillStyle='#2a9d8f';ctx.fillRect(gx,gy+gh-gh*1.05/1.2,24,gh*.1/1.2);const f=Math.min(1,st.fill/1.2);rr(gx,gy+gh*(1-f),24,gh*f,4,'rgba(43,45,66,.8)');txt(Math.round(st.fill*100)+'%',gx+12,gy+gh+18,13)}
  if(st.ph==='screed'&&down&&last){ctx.fillStyle='#ccc';ctx.fillRect(last.x-70,last.y-4,140,8)}}},
@@ -449,23 +450,24 @@ draw(){wallBG();studs();const td=this.topDone();DWS.forEach((sl,i)=>{if(st.sheet
 // 7 TAPE / MUD / SAND
 {name:'Tape & Mud',icon:'🪣',par:50,tip:'Swipe along each seam to apply tape',
 sf(s,ph){const a=s.v[ph];let t=0;for(const v of a)t+=v;return t/a.length},
-prog(ph=st.pi){if(ph>2)return 1;let t=0;for(const s of st.seams)t+=Math.min(1,this.sf(s,ph)/.97);if(ph===0)return t/st.seams.length;for(const c of st.spots)t+=c.v[ph];return t/(st.seams.length+st.spots.length)},
+prog(ph=st.pi){if(ph>2)return 1;let t=0;for(const s of st.seams)t+=Math.min(1,this.sf(s,ph)/.9);if(ph===0)return t/st.seams.length;for(const c of st.spots)t+=c.v[ph];return t/(st.seams.length+st.spots.length)},
 init(){st.spots=DWS.flatMap(dwScrews).map(c=>({x:c.x,y:c.y,v:[0,0,0]}));st.pi=0;st.hits=0;st.seams=DW_SEAMS.map(m=>{const n=m.h?48:12;return m.h?{h:1,x1:X(m.x1),x2:X(m.x2),y:Yh(m.y),n,v:[0,1,2].map(()=>new Array(n).fill(0))}:{h:0,x:X(m.x),y1:Yh(m.y2),y2:Yh(m.y1),n,v:[0,1,2].map(()=>new Array(n).fill(0))}});msg('Tape the long bevel seam at 48" and both butt joints')},
 down(p){this.work(p)},
 move(p,l){const n=Math.max(1,Math.ceil(dist(p,l)/4));for(let i=1;i<=n;i++)this.work({x:l.x+(p.x-l.x)*i/n,y:l.y+(p.y-l.y)*i/n})},
-work(p){if(p.y<WY||p.y>FY||st.pi>2)return;let hit=false;const tw=Math.max(st.tool>1?30:st.tool?22:14,14+(st.pi>=1?knife().sw:0));for(const s of st.seams){let i=-1;if(s.h){if(Math.abs(p.y-s.y)<tw&&p.x>=s.x1&&p.x<=s.x2)i=Math.min(s.n-1,Math.floor((p.x-s.x1)/(s.x2-s.x1)*s.n))}else if(Math.abs(p.x-s.x)<tw&&p.y>=s.y1-4&&p.y<=s.y2+4)i=Math.max(0,Math.min(s.n-1,Math.floor((p.y-s.y1)/(s.y2-s.y1)*s.n)));if(i<0)continue;hit=true;const a=s.v[st.pi];if(a[i]<1){a[i]=Math.min(1,a[i]+(st.tool>1?1:st.tool?.6:.25));if(Math.random()<.3)puff(p.x,p.y,'#ddd')}}
+work(p){if(p.y<WY||p.y>FY||st.pi>2)return;let hit=false;const tw=Math.max(st.tool>1?30:st.tool?22:14,14+(st.pi>=1?knife().sw:0));for(const s of st.seams){let i=-1;if(s.h){if(Math.abs(p.y-s.y)<tw&&p.x>=s.x1&&p.x<=s.x2)i=Math.min(s.n-1,Math.floor((p.x-s.x1)/(s.x2-s.x1)*s.n))}else if(Math.abs(p.x-s.x)<tw&&p.y>=s.y1-4&&p.y<=s.y2+4)i=Math.max(0,Math.min(s.n-1,Math.floor((p.y-s.y1)/(s.y2-s.y1)*s.n)));if(i<0)continue;hit=true;const a=s.v[st.pi];if(st.pi===2&&a[i]>=1)st.scrub=(st.scrub||0)+1;if(a[i]<1){a[i]=1;if(Math.random()<.3)puff(p.x,p.y,'#ddd')}}
  if(st.pi>=1)for(const c of st.spots)if(c.v[st.pi]<1&&Math.abs(p.x-c.x)<(st.tool>1?24:st.tool?18:12)&&Math.abs(p.y-c.y)<Math.max(knife().ry,st.tool>1?24:st.tool?18:12)){c.v[st.pi]=1;hit=true;if(Math.random()<.4)puff(c.x,c.y,'#ddd')}
  if(hit){st.hits++;if(now()-(st.snd||0)>.13){st.snd=now();st.pi===2?SND.roller():SND.mud()}}else if(inR(p,WX,WY,WW,WH))st.miss++;
- if(this.prog()>=1){st.pi++;sfx(520);if(st.pi===1)msg('Taped! Now mud the seams AND spot every screw head');else if(st.pi===2)msg('Mud is dry! Sand the seams and screw spots');else{const q=st.hits/(st.hits+st.miss*.5+1);finish(q,q<.7?['Visible ridges — mud smeared off the seams']:[])}}},
+ if(this.prog()>=1){st.pi++;sfx(520);if(st.pi===1)msg('Taped! Now mud the seams AND spot every screw head');else if(st.pi===2)msg('Mud is dry! Sand the seams and screw spots');else{// v11: inspection uses the same sand metric as the on-screen bar. One full pass passes; ridges only if <85% sanded; over-sanding only for heavy repeated scrubbing
+ const sanded=this.prog(2),cells=st.seams.reduce((t,s)=>t+s.n,0),heavy=(st.scrub||0)>cells*12,iss=[];if(sanded<.85)iss.push('Visible ridges — '+Math.round((1-sanded)*100)+'% of the seams left unsanded');if(heavy)iss.push('Over-sanded — scuffed the paper face');st.sandRes={sanded,scrub:st.scrub||0,limit:cells*12};finish(1-(heavy?.2:0)-(sanded<.85?.3:0),iss)}}},
 draw(){wallBG();drywallWall();const ph=Math.min(st.pi,2);
  const B=(s,a,b,o,w,fn)=>{if(s.h)fn(s.x1+a,s.y-w/2+o,b-a,w);else fn(s.x-w/2+o,s.y1+a,w,b-a)};
  for(const s of st.seams){const L=s.h?s.x2-s.x1:s.y2-s.y1,cw=L/s.n;for(let i=0;i<s.n;i++){const a=i*cw,b=a+cw+1,[t,m,sd]=[s.v[0][i],s.v[1][i],s.v[2][i]];
   if(t>0){ctx.fillStyle=`rgba(245,235,205,${t})`;B(s,a,b,0,10,(x,y,w,h)=>ctx.fillRect(x,y,w,h))}
   if(m>0){ctx.fillStyle=`rgba(250,250,245,${m})`;B(s,a,b,0,22,(x,y,w,h)=>ctx.fillRect(x,y,w,h))}
   if(m>=1){ctx.fillStyle=`rgba(200,195,180,${1-sd})`;for(let k=0;k<3;k++)B(s,a+k*4,a+k*4+3,-8+((i*7+k*5)%14)+1,2,(x,y,w,h)=>ctx.fillRect(x,y,w,h))}}
-  const sd=st.pi>2||this.sf(s,ph)>=.97;ctx.strokeStyle=sd?'rgba(42,157,143,.8)':'rgba(231,111,81,'+(.45+.35*Math.sin(now()*6))+')';ctx.setLineDash([4,6]);ctx.lineWidth=sd?2:3;B(s,0,L,0,28,(x,y,w,h)=>ctx.strokeRect(x,y,w,h));ctx.setLineDash([])}
+  const sd=st.pi>2||this.sf(s,ph)>=.9;ctx.strokeStyle=sd?'rgba(42,157,143,.8)':'rgba(231,111,81,'+(.45+.35*Math.sin(now()*6))+')';ctx.setLineDash([4,6]);ctx.lineWidth=sd?2:3;B(s,0,L,0,28,(x,y,w,h)=>ctx.strokeRect(x,y,w,h));ctx.setLineDash([])}
  for(const c of st.spots){if(c.v[1]>0){ctx.fillStyle=`rgba(250,250,245,${1-c.v[2]*.35})`;ctx.beginPath();ctx.arc(c.x,c.y,6,0,7);ctx.fill();if(!c.v[2]){ctx.fillStyle='rgba(200,195,180,.8)';ctx.fillRect(c.x-3,c.y-1,6,2)}}else if(st.pi===1&&now()%1<.6){ctx.strokeStyle='rgba(231,111,81,.7)';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(c.x,c.y,6,0,7);ctx.stroke()}else if(st.pi===2&&c.v[2]<1){}}
- const left=st.pi>2?[]:st.seams.filter(s=>this.sf(s,ph)<.97);const spl=st.pi>=1&&st.pi<=2?st.spots.filter(c=>c.v[st.pi]<1).length:0;if((left.length||spl)&&this.prog()>.6)txt('Still needs work: '+left.map(s=>s.h?'long 48" seam':'butt joint').concat(spl?[spl+' screw spot'+(spl>1?'s':'')]:[]).join(', '),WX+WW,FY+56,10,'#e76f51','right','700');rr(WX,FY+10,250,30,4,'rgba(43,45,66,.85)');txt(['Tape ','Mud ','Sanding '][ph]+Math.floor(this.prog(ph)*100)+'%',WX+12,FY+30,13,'#fff','left','700');
+ const left=st.pi>2?[]:st.seams.filter(s=>this.sf(s,ph)<.9);const spl=st.pi>=1&&st.pi<=2?st.spots.filter(c=>c.v[st.pi]<1).length:0;if((left.length||spl)&&this.prog()>.6)txt('Still needs work: '+left.map(s=>s.h?'long 48" seam':'butt joint').concat(spl?[spl+' screw spot'+(spl>1?'s':'')]:[]).join(', '),WX+WW,FY+56,10,'#e76f51','right','700');rr(WX,FY+10,250,30,4,'rgba(43,45,66,.85)');txt(['Tape ','Mud ','Sanding '][ph]+Math.floor(this.prog(ph)*100)+'%',WX+12,FY+30,13,'#fff','left','700');
  ['TAPE','MUD','SAND'].forEach((n,i)=>{rr(WX+110+i*46,FY+16,42,18,9,i<st.pi?'#2a9d8f':i===st.pi?'#ffb703':'#ccc');txt(n,WX+131+i*46,FY+29,9,'#2b2d42','center','800')});
  if(down&&last){if(ph>=1){const K=knife(),hh=Math.max(10,K.ry);ctx.fillStyle=ph===1?'#c9ced6':'#e9c46a';ctx.fillRect(last.x-3,last.y-hh,6,hh*2);ctx.fillStyle='rgba(250,250,245,.8)';ctx.fillRect(last.x-6,last.y-hh,3,hh*2);ctx.fillStyle='#6d4c41';ctx.fillRect(last.x+3,last.y-4,20,8);txt(K.n,last.x+26,last.y+4,9,'#2b2d42','left','800')}else{ctx.fillStyle='#f5ebcd';ctx.fillRect(last.x-16,last.y-6,32,12);ctx.fillStyle='#6d4c41';ctx.fillRect(last.x-3,last.y+6,6,22)}}
  if(st.pi>=1&&st.pi<=2)txt('🔪 '+knife().n+' · '+['','1 row','2 rows','3 rows'][[12,34,66].indexOf(knife().ry)+1]+' per swipe',WX+WW-6,FY+30,10,'#2b2d42','right','700')}},
@@ -654,7 +656,7 @@ draw(){const T=TH();ctx.fillStyle=T.wall==='sky'?'#eee':T.wall;ctx.fillRect(-400
  rr(60,470,240,14,7,'#fff');rr(60,470,Math.max(14,240*Math.min(1,wb/1.2)),14,7,wb<.1?'#2a9d8f':'#e63946');txt('Wobble',180,500,12,'#2b2d42')}},
 // 17 SERVICE CALL / EVENT ENGINE (index 16) — data-driven mini-tasks: diag → tap / drag / swipe / choice steps
 {name:'Service Call',icon:'🧰',par:60,tip:'',
-init(){const D=CALLDEF;Object.assign(st,{D,si:-1,ph:D.diag?'diag':'work',marks:[],o:null,seq:0,done:{},cov:null,q:null});if(D.event)msg('⚠ '+D.n+' '+D.complaint);else msg((CALLCTX&&CALLCTX.kind==='hm'&&isChallenge(CALLCTX.k)?'🏆 CHALLENGE (3× pay): ':'')+'"'+D.complaint+'"');if(!D.diag)this.next()},
+init(){const D=CALLDEF;Object.assign(st,{D,si:-1,ph:D.diag?'diag':'work',marks:[],o:null,seq:0,done:{},cov:null,q:null});if(D.event)msg('⚠ '+D.n+' '+D.complaint);else msg((CALLCTX&&CALLCTX.kind==='hm'&&isChallenge(CALLCTX.k)?'🏆 CHALLENGE (3× pay): ':'')+(D.client?D.client+' ('+D.pers+') called — diagnose the problem':'"'+D.complaint+'"'));if(!D.diag)this.next()},
 step(){return st.D.steps[st.si]},
 hire(){const s=this.step(),P=SUBP[s.tr]||400;if(SAVE.money<P)return;SAVE.money-=P;save();st.hiredTr=s.tr;SND.coin();toast={t:now(),s:'Hired a '+s.tr+' for $'+P+' — their part is done perfectly'};while(st.D.steps[st.si+1]&&st.D.steps[st.si+1].tr===s.tr)st.si++;st.cov=null;st.o=null;this.next()},
 next(){st.si++;st.seq=0;st.done={};st.drag=null;const s=this.step();if(!s){callDone();return}
@@ -674,11 +676,11 @@ down(p){if(st.ph==='diag')return;const s=this.step();if(!s)return;
  else if(s.t==='swipe')this.move(p,p)},
 move(p,l){const s=this.step();if(!s||st.ph==='diag')return;if(s.t==='drag'&&st.drag){st.o.x=p.x-st.drag.dx;st.o.y=p.y-st.drag.dy}
  if(s.t==='swipe'&&st.cov){const n=Math.max(1,Math.ceil(dist(p,l)/5));for(let i=0;i<=n;i++){const q={x:l.x+(p.x-l.x)*i/n,y:l.y+(p.y-l.y)*i/n};
-   s.segs.forEach((g,gi)=>{const [x1,y1,x2,y2]=g,dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy;const tt=((q.x-x1)*dx+(q.y-y1)*dy)/L2;if(tt<-.04||tt>1.04)return;const px=x1+dx*clamp(tt,0,1),py=y1+dy*clamp(tt,0,1);if(Math.hypot(q.x-px,q.y-py)<(s.w||16)+(st.tool?10:6)){const c=clamp(Math.floor(tt*12),0,11);st.cov[gi][c]=Math.min(1,st.cov[gi][c]+.4)}})}
+   s.segs.forEach((g,gi)=>{const [x1,y1,x2,y2]=g,dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy;const tt=((q.x-x1)*dx+(q.y-y1)*dy)/L2;if(tt<-.04||tt>1.04)return;const px=x1+dx*clamp(tt,0,1),py=y1+dy*clamp(tt,0,1);if(Math.hypot(q.x-px,q.y-py)<(s.w||16)+(st.tool?10:6)){const c=clamp(Math.floor(tt*12),0,11);st.cov[gi][c]=1}})}
   if(now()-(st.snd||0)>.12){st.snd=now();SND[s.snd||'mud']()}if(Math.random()<.3)puff(p.x,p.y,s.c||'#ddd',2);
-  if(st.cov.every(a=>a.reduce((x,y)=>x+y,0)/a.length>=.97)){st.marks.push({si:st.si,segs:s.segs,w:s.w||16,c:s.c});st.cov=null;buzz(12);this.next()}}},
+  if(swProg(st.cov)>=1){st.marks.push({si:st.si,segs:s.segs,w:s.w||16,c:s.c});st.cov=null;buzz(12);this.next()}}},
 up(){const s=this.step();if(s&&s.t==='drag'&&st.drag){st.drag=null;const T=s.to,tol=T.tol||s.tol||45;if(Math.abs(st.o.x+st.o.w/2-(T.x+T.w/2))<tol&&Math.abs(st.o.y+st.o.h/2-(T.y+T.h/2))<tol){Object.assign(st.o,{x:T.x+(T.w-st.o.w)/2,y:T.y+(T.h-st.o.h)/2});st.marks.push({si:st.si,o:{...st.o}});SND[s.snd||'clank']();buzz(14);shake(1.5);puff(T.x+T.w/2,T.y+T.h/2,'#fff',10);this.next()}else{st.o={...s.o};msg('Not there — '+s.m.toLowerCase())}}},
-bg(){const b=st.D.bg;if(b==='wall'){wallBG();drywallWall(false);finishedSeams();ctx.fillStyle='rgba(214,207,196,.55)';ctx.fillRect(WX,WY,WW,WH)}
+bg(){const b=st.D.bg;if(b==='wall'){wallBG();drywallWall(false);finishedSeams();ctx.fillStyle=st.D.wc||'rgba(214,207,196,.55)';ctx.globalAlpha=st.D.wc?.85:1;ctx.fillRect(WX,WY,WW,WH);ctx.globalAlpha=1}
  else if(b==='bath'){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#d5e3e6';for(let y=0;y<FY;y+=20){ctx.fillRect(0,y,W,1);for(let x=((y/20)%2)*20;x<W;x+=40)ctx.fillRect(x,y,1,20)}ctx.fillStyle='#dfe6ea';ctx.fillRect(0,FY+10,W,H)}
  else if(b==='floor'){ctx.fillStyle='#9aa5ad';ctx.fillRect(0,0,W,H);for(let y=-10;y<H;y+=80)for(let x=150;x<W;x+=80){ctx.fillStyle=((x+y)/80)%2?'#e8ebee':'#dde2e6';ctx.fillRect(x+2,y+2,76,76)}}
  else if(b==='kitchen'){ctx.fillStyle='#f3ead8';ctx.fillRect(0,0,W,H);ctx.fillStyle='#8d6e63';ctx.fillRect(360,40,300,12);ctx.fillStyle='#5c4033';ctx.fillRect(370,52,280,320);ctx.fillStyle='#3e2c22';ctx.fillRect(380,62,260,300);
@@ -690,8 +692,9 @@ draw(){this.bg();const D=st.D,s=this.step();
  for(const m of st.marks){if(m.o){const o=m.o;rr(o.x,o.y,o.w,o.h,3,o.c);if(o.l){const fz=Math.min(90,Math.min(o.w,o.h)*.75);txt(o.l,o.x+o.w/2,o.y+o.h/2+fz*.35,fz,'#000')}}if(m.segs)for(const g of m.segs)strokePath([{x:g[0],y:g[1]},{x:g[2],y:g[3]}],m.c,m.w*.8);if(m.taps)for(const t of m.taps){ctx.fillStyle='#2a9d8f';ctx.beginPath();ctx.arc(t.x,t.y,6,0,7);ctx.fill()}}
  if(s&&st.ph!=='diag'){if(s.t==='tap'){const finder=owned('up_finder')&&s.hide;s.it.forEach((it,k)=>{if(st.done[k]){ctx.fillStyle='#2a9d8f';ctx.beginPath();ctx.arc(it.x,it.y,8,0,7);ctx.fill();return}if(it.c){ctx.fillStyle=it.c;ctx.beginPath();ctx.arc(it.x,it.y,9,0,7);ctx.fill()}if(it.l)txt(it.l,it.x,it.y+8,22,'#000');pulse(it.x,it.y,finder&&!it.bad?'#2a9d8f':'#e76f51',7);if(!s.hide&&it.n)txt(it.n,it.x,it.y-16,10,'#2b2d42','center','700');else if(s.hide)txt('?',it.x,it.y-16,11,'#2b2d42','center','700')})}
   else if(s.t==='drag'){const T=s.to;ctx.setLineDash([6,5]);ctx.strokeStyle='#e76f51';ctx.lineWidth=2;ctx.strokeRect(T.x,T.y,T.w,T.h);ctx.setLineDash([]);const o=st.o;if(o.c!=='rgba(0,0,0,0)')rr(o.x+3,o.y+3,o.w,o.h,3,'rgba(0,0,0,.2)');rr(o.x,o.y,o.w,o.h,3,o.c);if(o.l){const fz=Math.min(90,Math.min(o.w,o.h)*.75);txt(o.l,o.x+o.w/2,o.y+o.h/2+fz*.35,fz,'#000')}}
-  else if(s.t==='swipe'&&st.cov){s.segs.forEach((g,gi)=>{const [x1,y1,x2,y2]=g,dn=st.cov[gi].reduce((x,y)=>x+y,0)/12>=.97;ctx.setLineDash([5,5]);ctx.strokeStyle=dn?'rgba(42,157,143,.9)':'rgba(231,111,81,.7)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([]);
+  else if(s.t==='swipe'&&st.cov){s.segs.forEach((g,gi)=>{const [x1,y1,x2,y2]=g,dn=segF(st.cov[gi])>=.9;ctx.setLineDash([5,5]);ctx.strokeStyle=dn?'rgba(42,157,143,.9)':'rgba(231,111,81,'+(.55+.35*Math.sin(now()*6))+')';ctx.lineWidth=dn?2:3;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([]);
     for(let c=0;c<12;c++){const v=st.cov[gi][c];if(v<=0)continue;const a={x:x1+(x2-x1)*c/12,y:y1+(y2-y1)*c/12},b={x:x1+(x2-x1)*(c+1)/12,y:y1+(y2-y1)*(c+1)/12};ctx.globalAlpha=v;strokePath([a,b],s.c||'#fff',(s.w||16)*.8);ctx.globalAlpha=1}})}
+  if(s.t==='swipe'&&st.cov){const pc=Math.floor(swProg(st.cov)*100);rr(WX,FY+10,170,24,4,'rgba(43,45,66,.85)');txt('Progress '+pc+'%'+(st.cov.length>1?' · '+st.cov.filter(a=>segF(a)<.9).length+' line(s) left':''),WX+10,FY+27,11,'#fff','left','700')}
   else if(s.t==='choice'){rr(300,120,400,120,8,'rgba(255,255,255,.95)');wrap(st.q.q,500,160,360,15,'#2b2d42',20,'center',3);txt('◀ answer on the left',500,224,11,'#888','center','400')}}
  if(st.ph==='diag'){rr(250,40,500,150,10,'rgba(255,255,255,.96)');txt(D.icon+'  '+(D.event?'TWIST: ':'')+D.n,270,70,16,'#2b2d42','left','800');wrap('"'+D.complaint+'"',270,98,460,13,'#444',18,'left',3);txt('DIAGNOSE: '+D.diag.q,270,170,13,'#e76f51','left','800')}
  if(D.event&&st.ph!=='diag'){rr(560,8,250,26,13,'rgba(231,111,81,.92)');txt('⚠ TWIST: '+D.n,685,26,11,'#fff','center','800')}}},
@@ -837,6 +840,49 @@ const CALLS=[
  {id:'patch',lv:20,n:'Doorknob hole',icon:'🕳️',bg:'wall',complaint:'The doorknob punched a hole right through my wall!',diag:{q:'Best fix for a 3" hole?',o:['California patch','Caulk it','Paint over it'],ok:0,why:'a hole that size needs new drywall behind the mud'},
   deco:[{x:470,y:160,w:44,h:44,c:'#2b2b2b',round:1,s1:1},{x:220,y:60,w:20,h:268,c:'#a0522d'}],
   steps:[{t:'drag',m:'Drag the drywall patch over the hole',o:{x:640,y:290,w:76,h:76,c:'#e9e7e2',l:''},to:{x:454,y:144,w:76,h:76},snd:'thud'},{t:'swipe',m:'Swipe mud over the patch edges',segs:[[440,182,544,182],[492,134,492,232]],w:30,c:'#f6f4ee',snd:'mud'},{t:'tap',m:'Spot mud over each screw head',it:[{x:462,y:152,n:'screw'},{x:522,y:152,n:'screw'},{x:462,y:212,n:'screw'},{x:522,y:212,n:'screw'}],snd:'mud'},{t:'swipe',m:'Sand it smooth',segs:[[436,150,548,150],[436,214,548,214]],w:26,c:'rgba(255,255,255,.35)',snd:'roller'}]},
+ {id:'nailpop',lv:20,n:'Nail pops',icon:'📌',bg:'wall',complaint:'Little bumps keep popping out of my wall in rows.',diag:{q:'Best fix for popped nails?',o:['Screw beside, then spot','Hammer them back in','Paint over them'],ok:0,why:'hammered nails just pop again'},
+  deco:[{x:430,y:110,w:8,h:8,c:'#cfc8bb',round:1,s1:1},{x:430,y:170,w:8,h:8,c:'#cfc8bb',round:1,s1:1},{x:430,y:230,w:8,h:8,c:'#cfc8bb',round:1,s1:1}],
+  steps:[{t:'tap',m:'Drive a drywall screw just beside each pop',it:[{x:446,y:114,n:'screw'},{x:446,y:174,n:'screw'},{x:446,y:234,n:'screw'}],snd:'screw'},
+   {t:'tap',m:'Spot mud over every screw and pop',it:[{x:440,y:114,n:'spot'},{x:440,y:174,n:'spot'},{x:440,y:234,n:'spot'}],snd:'mud'},
+   {t:'swipe',m:'Sand the spots smooth',segs:[[440,100,440,250]],w:22,c:'rgba(255,255,255,.35)',snd:'roller'}]},
+ {id:'ding',lv:20,n:'Dent & ding',icon:'🔨',bg:'wall',complaint:'Moving the couch left a dent in the wall.',diag:{q:'Shallow dent — best fix?',o:['Spackle, sand, touch up','Replace the sheet','Caulk it'],ok:0,why:'a shallow dent just needs filling'},
+  deco:[{x:486,y:178,w:28,h:28,c:'rgba(90,80,60,.2)',round:1,s1:1}],
+  steps:[{t:'swipe',m:'Knife spackle across the dent',segs:[[460,191,540,191]],w:26,c:'#f6f4ee',snd:'mud'},{t:'swipe',m:'Sand it flush',segs:[[456,191,544,191]],w:28,c:'rgba(255,255,255,.35)',snd:'roller'},
+   {t:'swipe',m:'Touch up with matching paint',segs:[[440,175,560,175],[440,207,560,207]],w:26,c:'WALL',snd:'roller'}]},
+ {id:'bighole',lv:20,n:'Big hole (needs backing)',icon:'🕳️',bg:'wall',complaint:'My kid kicked a soccer ball clean through the wall.',diag:{q:'A 6" hole — what goes in first?',o:['Wood backing inside','Just mud it','Tape across the hole'],ok:0,why:'nothing to screw the patch to without backing'},
+  deco:[{x:450,y:140,w:90,h:90,c:'#2b2b2b',round:1,s1:2}],
+  steps:[{t:'drag',m:'Slide a backing strip into the hole',o:{x:640,y:300,w:120,h:18,c:'#c99a5b'},to:{x:435,y:176,w:120,h:18},snd:'thud'},
+   {t:'tap',m:'Screw the backing to the drywall',it:[{x:442,y:185,n:'screw'},{x:548,y:185,n:'screw'}],snd:'screw'},
+   {t:'drag',m:'Screw a drywall patch over the backing',o:{x:640,y:260,w:100,h:100,c:'#e9e7e2'},to:{x:445,y:135,w:100,h:100},snd:'thud'},
+   {t:'swipe',m:'Tape & mud the patch edges',segs:[[440,135,550,135],[440,235,550,235],[445,130,445,240],[545,130,545,240]],w:16,c:'#f6f4ee',snd:'mud'}]},
+ {id:'bead',lv:20,n:'Cracked corner bead',icon:'📐',bg:'wall',complaint:'The outside corner by the stairs is cracked and flaking.',diag:{q:'Cracked metal corner bead?',o:['Replace bead, then mud','Caulk the crack','Paint over it'],ok:0,why:'cracked bead keeps flaking until it\'s replaced'},
+  deco:[{x:490,y:60,w:14,h:260,c:'#b9b2a4',crack:1,s1:2}],
+  steps:[{t:'swipe',m:'Cut out the damaged bead',segs:[[497,70,497,310]],w:12,c:'#8a8174',snd:'saw'},
+   {t:'drag',m:'Set the new corner bead',o:{x:660,y:80,w:14,h:240,c:'#d9d9d9'},to:{x:490,y:65,w:14,h:250},snd:'clank'},
+   {t:'tap',m:'Nail the bead every 8"',it:[{x:497,y:90,n:'nail'},{x:497,y:170,n:'nail'},{x:497,y:250,n:'nail'},{x:497,y:300,n:'nail'}],snd:'nail'},
+   {t:'swipe',m:'Mud both sides of the bead',segs:[[485,70,485,310],[509,70,509,310]],w:18,c:'#f6f4ee',snd:'mud'}]},
+ {id:'picture',lv:20,n:'Picture-hanger holes',icon:'🖼️',bg:'wall',complaint:'We took the photos down and the wall is full of little holes.',diag:{q:'Small nail holes — best fix?',o:['Spackle, sand, paint','Leave them','Toothpaste'],ok:0,why:'spackle shrinks less and sands clean'},
+  deco:[{x:430,y:120,w:5,h:5,c:'#333',round:1,s1:1},{x:520,y:110,w:5,h:5,c:'#333',round:1,s1:1},{x:470,y:200,w:5,h:5,c:'#333',round:1,s1:1},{x:560,y:190,w:5,h:5,c:'#333',round:1,s1:1}],
+  steps:[{t:'tap',m:'Press spackle into each hole',it:[{x:432,y:122,n:'hole'},{x:522,y:112,n:'hole'},{x:472,y:202,n:'hole'},{x:562,y:192,n:'hole'}],snd:'mud'},
+   {t:'swipe',m:'Light sand',segs:[[420,116,580,116],[420,196,580,196]],w:20,c:'rgba(255,255,255,.35)',snd:'roller'},
+   {t:'swipe',m:'Touch up with the matching wall color',segs:[[410,116,590,116],[410,156,590,156],[410,196,590,196]],w:28,c:'WALL',snd:'roller'}]},
+ {id:'scuff',lv:20,n:'Scuffed hallway',icon:'👟',bg:'wall',complaint:'Backpacks and shoes have scuffed the hallway walls.',diag:{q:'Scuffs won\'t wash off — next?',o:['Clean, prime, repaint','Bleach it','Just sandpaper'],ok:0,why:'scrubbing burnishes flat paint'},
+  deco:[{x:360,y:230,w:60,h:10,c:'rgba(60,60,60,.35)',s1:1},{x:470,y:250,w:80,h:8,c:'rgba(60,60,60,.3)',s1:1},{x:600,y:225,w:50,h:10,c:'rgba(60,60,60,.35)',s1:1}],
+  steps:[{t:'swipe',m:'Wipe the wall down',segs:[[340,240,680,240]],w:30,c:'rgba(180,220,255,.3)',snd:'whoosh'},
+   {t:'swipe',m:'Roll a fresh coat over the section',segs:[[320,200,700,200],[320,240,700,240],[320,280,700,280]],w:32,c:'WALL',snd:'roller'}]},
+ {id:'stress',lv:20,n:'Crack over a door',icon:'🚪',bg:'wall',complaint:'A crack keeps coming back above my bedroom door.',diag:{q:'Diagonal crack off a door corner?',o:['Open it, mesh tape, mud','Caulk it','Paint over it'],ok:0,why:'stress cracks return without tape'},
+  deco:[{x:420,y:150,w:160,h:178,c:'#8d6e63'},{x:575,y:100,w:60,h:50,c:'rgba(0,0,0,0)',crack:1,s1:3}],
+  steps:[{t:'swipe',m:'V-cut along the crack',segs:[[580,148,632,104]],w:12,c:'#a59c8c',snd:'saw'},{t:'swipe',m:'Lay mesh tape over it',segs:[[578,150,634,102]],w:14,c:'#f5ebcd',snd:'mud'},
+   {t:'swipe',m:'Feather mud wide over the tape',segs:[[570,150,640,100],[586,156,646,110]],w:22,c:'#f6f4ee',snd:'mud'}]},
+ {id:'stain',lv:20,n:'Ceiling water stain',icon:'💧',bg:'wall',complaint:'The roof leak is fixed but there\'s an ugly brown ring up top.',diag:{q:'Water stain, leak already fixed — use…',o:['Stain-block primer + paint','Regular paint only','Bleach'],ok:0,why:'stains bleed right through normal paint'},
+  deco:[{x:440,y:50,w:130,h:70,c:'rgba(140,100,40,.35)',round:1,s1:1}],
+  steps:[{t:'tap',m:'Moisture-check it — must be dry',it:[{x:505,y:85,n:'meter',l:'📟'}],snd:'click'},
+   {t:'swipe',m:'Roll stain-blocking primer',segs:[[420,70,590,70],[420,100,590,100]],w:30,c:'#ffffff',snd:'roller'},
+   {t:'swipe',m:'Paint to match the ceiling',segs:[[410,65,600,65],[410,95,600,95],[410,125,600,125]],w:30,c:'#f4f2ec',snd:'roller'}]},
+ {id:'peel',lv:20,n:'Peeling tape seam',icon:'🧻',bg:'wall',complaint:'A long strip of paper is peeling off the wall.',diag:{q:'Loose, bubbled tape seam?',o:['Cut out, re-tape, mud','Glue it back','Paint over it'],ok:0,why:'loose tape never re-sticks on its own'},
+  deco:[{x:520,y:60,w:16,h:250,c:'#efe6cf',s1:1}],
+  steps:[{t:'swipe',m:'Slice out the loose tape',segs:[[528,70,528,300]],w:12,c:'#b8ad99',snd:'saw'},{t:'swipe',m:'Bed new tape in mud',segs:[[528,70,528,300]],w:14,c:'#f5ebcd',snd:'mud'},
+   {t:'swipe',m:'Top coat & feather',segs:[[516,70,516,300],[540,70,540,300]],w:20,c:'#f6f4ee',snd:'mud'},{t:'swipe',m:'Sand the seam',segs:[[528,70,528,300]],w:30,c:'rgba(255,255,255,.35)',snd:'roller'}]},
  {id:'filter',lv:30,n:'Furnace filter',icon:'🌀',bg:'basement',complaint:'The house is dusty and the furnace runs all day.',diag:{q:'First thing to check?',o:['Air filter','Thermostat battery','Gas meter'],ok:0,why:'restricted airflow = long run times + dust'},
   deco:[{x:420,y:60,w:160,h:270,c:'#6c757d'},{x:440,y:90,w:120,h:120,c:'#495057',l:'🔥'}],
   steps:[{t:'tap',m:'Shut the furnace switch off first',it:[{x:640,y:110,n:'switch',l:'⏻'}],snd:'click'},{t:'drag',m:'Pull the clogged filter out',o:{x:430,y:250,w:140,h:22,c:'#6b5b3e'},to:{x:620,y:340,w:140,h:22},tol:90,snd:'whoosh'},
@@ -884,8 +930,26 @@ const CALLS=[
    {tr:'electrician',t:'tap',m:'Electrician: breaker off, then connect ground, white, black',ord:1,it:[{x:262,y:150,n:'breaker',l:'⚡'},{x:460,y:90,n:'ground',c:'#2a9d8f'},{x:500,y:90,n:'white',c:'#eee'},{x:540,y:90,n:'black',c:'#222'}],snd:'screw'}]}];
 function callsUnlocked(){return CALLS.filter(c=>c.lv<=Math.max(SAVE.story.max,0))}
 // v9: every 10th handyman level is a CHALLENGE call (3+ trades, bigger pay, Hire-a-sub allowed); all others are 1-2 trade calls
+// v11: shared swipe metric — a segment counts done at 90% of its cells; display and completion both use swProg
+function segF(a){return a.reduce((x,y)=>x+y,0)/a.length}function swProg(cov){return cov.reduce((t,a)=>t+Math.min(1,segF(a)/.9),0)/cov.length}
 function isChallenge(k){return k>0&&k%10===0}
-function hmCall(k){const A=callsUnlocked();const r=rng(k*104729+7);if(isChallenge(k)){const M=CALLS.filter(c=>c.multi);return M[Math.floor(k/10-1)%M.length]}const U=A.filter(c=>!c.multi);if(!U.length)return CALLS[0];const i=k-1-Math.floor(k/10);if(i<U.length)return U[i];return U[Math.floor(r()*U.length)]}
+// v11: handyman level → call type via a seeded shuffle bag. Assignments are saved, so a level's call never changes after it is first seen,
+// types cycle before repeating, and the same type never appears twice in a row.
+function hmCall(k){if(isChallenge(k)){const M=CALLS.filter(c=>c.multi);return M[Math.floor(k/10-1)%M.length]}
+ const MAP=SAVE.hmMap||(SAVE.hmMap={});if(!SAVE.hmBag)SAVE.hmBag=[];const byId=id=>CALLS.find(c=>c.id===id)||CALLS[0];if(MAP[k])return byId(MAP[k]);
+ let last=null;for(let j=1;j<=k;j++){if(isChallenge(j))continue;if(MAP[j]){last=MAP[j];continue}
+  if(!SAVE.hmBag.length){const r=rng(j*7919+3),pool=callsUnlocked().filter(c=>!c.multi).map(c=>c.id);for(let i=pool.length-1;i>0;i--){const q=Math.floor(r()*(i+1));[pool[i],pool[q]]=[pool[q],pool[i]]}if(pool.length>1&&pool[pool.length-1]===last)[pool[0],pool[pool.length-1]]=[pool[pool.length-1],pool[0]];SAVE.hmBag=pool}
+  let id=SAVE.hmBag.pop();if(id===last&&SAVE.hmBag.length){const o=SAVE.hmBag.shift();SAVE.hmBag.push(id);id=o}MAP[j]=id||'patch';last=MAP[j]}
+ save();return byId(MAP[k])}
+const HM_ROOMS=['hallway','bedroom','living room','home office','kitchen','stairwell','den'],HM_WALLS=['#e7dccb','#d9e4dc','#e9d8d0','#dfe3ea','#f0e6c8','#e2dcea'];
+const HM_PERS=[['Busy','Make it quick, I have a meeting. ',.75],['Picky','I want it PERFECT, please. ',1.15],['Chatty','Oh hi! Come in, come in. So... ',1.1],['Nervous','Please hurry before my landlord sees. ',.85],['Relaxed','No rush at all. ',1.25],['Neighbor','Your work on the Parkers\' place was great! ',1]];
+function instCall(def,k){const r=rng(k*31337+11),pk=a=>a[Math.floor(r()*a.length)];const D=JSON.parse(JSON.stringify(def));const P=pk(HM_PERS),cl=pk(CLIENTS),room=pk(HM_ROOMS);
+ D.client=cl;D.pers=P[0];D.tp=P[2];D.complaint=P[1]+def.complaint;D.n=def.n+' · '+room;D.wc=pk(HM_WALLS);
+ if(def.bg==='wall'&&!def.multi){const dx=Math.round((r()-.5)*180),dy0=Math.round((r()-.5)*50),dy=def.id==='stain'?Math.abs(dy0):dy0,sc=.85+r()*.35;
+  const mv=o=>{if(!o||o.x===262)return;o.x+=dx;o.y+=dy};(D.deco||[]).forEach(d=>{if(d.x<300&&d.w<=24)return;const cx=d.x+d.w/2,cy=d.y+d.h/2;if(d.round&&d.w>20){d.w=Math.round(d.w*sc);d.h=Math.round(d.h*sc)}d.x=cx-d.w/2;d.y=cy-d.h/2;mv(d)});
+  for(const s of D.steps){(s.it||[]).forEach(mv);if(s.to)mv(s.to);if(s.segs)s.segs=s.segs.map(g=>[g[0]+dx,g[1]+dy,g[2]+dx,g[3]+dy]);if(s.c==='WALL')s.c=D.wc}
+  if(def.id==='picture'&&r()<.5){D.steps[0].it.pop();D.deco.pop()}}
+ for(const s of D.steps)if(s.c==='WALL')s.c=D.wc;return D}
 // ===== COLLECTIBLES / STAR SHOP =====
 const ITEMS=[{id:'pal_design',cat:'Paint colors',n:'Designer palette',c:5,pal:['#6b705c','#a5a58d','#ffe8d6','#cb997e','#3d405b']},{id:'pal_bold',cat:'Paint colors',n:'Bold palette',c:12,pal:['#e63946','#ffb703','#219ebc','#8338ec','#06d6a0']},
  {id:'hat_chrome',cat:'Hard hat',n:'Chrome hard hat',c:6,col:'#c0c0c0'},{id:'hat_camo',cat:'Hard hat',n:'Camo hard hat',c:12,col:'#4b5320'},{id:'hat_gold',cat:'Hard hat',n:'Gold hard hat',c:30,col:'#d4af37'},
@@ -916,7 +980,7 @@ function levelFromSave(){const c=SAVE.curLv;if(!c)return null;if(c.k==='daily')r
 function startLevel(L){HIREJ=null;CJ=L;SAVE.curLv=L.daily?{k:'daily',d:L.daily}:{k:'story',n:L.N};SAVE.results=[];SAVE.fine=0;SAVE.evDone={};SAVE.evBonus=0;BEF_OK=false;save();mode='map';SND.whoosh()}
 function startStage(i){cur=i;st={miss:0,tool:Math.max(toolTier(i),SAVE.temp[i]?1:0)};if(SAVE.temp[i]){delete SAVE.temp[i];save()}t0=now();mode='play';parts=[];msg(STAGES[i].tip);STAGES[i].init();if(!BEF_OK)CAPB=true}
 function playStage(i){const ev=CJ&&CJ.events&&CJ.events[i];if(ev&&!SAVE.evDone[i])startCall({...EVENTS[ev],event:1},{kind:'event',next:i});else startStage(i)}
-function startCall(def,ctx2){CALLDEF=def;CALLCTX=ctx2;if(ctx2.kind==='hm')BEF_OK=false;if(ctx2.kind==='hm'){const CJp=CJ;CJ={th:def.bg==='bath'?1:2,lv:1,elec:1,n:def.n,icon:def.icon,stages:[16],mult:1};CALLCTX.prevCJ=CJp}startStage(16);STAGES[16].par=20+def.steps.length*10}
+function startCall(def,ctx2){if(ctx2.kind==='hm')def=instCall(def,ctx2.k);CALLDEF=def;CALLCTX=ctx2;if(ctx2.kind==='hm')BEF_OK=false;if(ctx2.kind==='hm'){const CJp=CJ;CJ={th:def.bg==='bath'?1:2,lv:1,elec:1,n:def.n,icon:def.icon,stages:[16],mult:1};CALLCTX.prevCJ=CJp}startStage(16);STAGES[16].par=Math.round((20+def.steps.length*10)*(def.tp||1))}
 function callDone(){const t=now()-t0,mi=st.miss;if(CALLCTX.kind==='event'){SAVE.evDone[CALLCTX.next]=1;SAVE.evBonus=(SAVE.evBonus||0)+25;save();SND.chime();buzz([15,30,15]);toast={t:now(),s:'Twist handled! +$25 bonus'};startStage(CALLCTX.next);msg(STAGES[cur].tip);return}
  renderPlay();capture(AFT);const par=STAGES[16].par,stars=mi===0&&t<=par?3:mi<=2&&t<=par*2?2:1;const k=CALLCTX.k;const prev=SAVE.hm[k]||0;SAVE.hm[k]=Math.max(prev,stars);SAVE.hmMax=Math.max(SAVE.hmMax||0,k);
  const cash=Math.round((60+stars*20+k*2)*(isChallenge(k)?3:1)*(owned('up_cards')?1.1:1));SAVE.money+=cash;save();HMRES={k,stars,gain:Math.max(0,stars-prev),t,mi,cash,def:CALLDEF,hired:st.hiredTr||null};CJ=CALLCTX.prevCJ||null;parts=[];REV={next:'hmres',t0:now(),x:.5,user:0,title:CALLDEF.n};mode='reveal';SND.star();buzz([20,40,60]);shake(3)}
@@ -1038,6 +1102,6 @@ const Q=new URLSearchParams(location.search),qs=Q.get('stage');if(Q.get('job')!=
 if(Q.get('story')){SAVE.story.max=+Q.get('story');save()}if(Q.get('stars')){SAVE.hm[0]=+Q.get('stars');save()}
 if(Q.get('level'))startLevel(genLevel(+Q.get('level')));if(Q.get('call'))startCall(CALLS.find(c=>c.id===Q.get('call')),{kind:'hm',k:1});if(Q.get('screen'))mode=Q.get('screen');
 if(qs!==null){const n=+qs;if(n===0)mode='map';else if(n===12){curJob().stages.forEach(i=>SAVE.results[i]={q:.8+(i%3)*.07,t:STAGES[i].par,pay:80+i*3,issues:[]});mode='pay'}else if(n>=1&&n<=11)startStage(n-1);else if(n>12&&n<=17)startStage(n-2)}
-window.__game={STAGES,JOBS,get st(){return st},get mode(){return mode},get INS(){return INS},get CJ(){return CJ},get cur(){return cur},get REV(){return REV},get HMRES(){return HMRES},finish,SAVE,Monetize,toScreen,ctrls:()=>ctrlList().map(c=>({l:c.l,x:c.x+c.w/2,y:c.y+c.h/2})),W,H,startStage,genLevel,startLevel,startCall,playStage,CALLS,EVENTS,hmCall,dailyLevel,SKILLS,fps:()=>FT.reduce((a,b)=>a+b,0)/FT.length*1000,BEF,AFT,toolTier,knife,KNIVES,hmCall,isChallenge,TOOLS,ITEMS,itemPrice,toolOpen,TH,starsTotal};
+window.__game={STAGES,JOBS,get st(){return st},get mode(){return mode},get INS(){return INS},get CJ(){return CJ},get cur(){return cur},get REV(){return REV},get HMRES(){return HMRES},finish,SAVE,Monetize,toScreen,ctrls:()=>ctrlList().map(c=>({l:c.l,x:c.x+c.w/2,y:c.y+c.h/2})),W,H,startStage,genLevel,startLevel,startCall,playStage,CALLS,EVENTS,hmCall,dailyLevel,SKILLS,fps:()=>FT.reduce((a,b)=>a+b,0)/FT.length*1000,BEF,AFT,instCall,swProg,toolTier,knife,KNIVES,hmCall,isChallenge,TOOLS,ITEMS,itemPrice,toolOpen,TH,starsTotal};
 loop();
 </script></body></html>
